@@ -193,6 +193,7 @@ export async function saveChapterToDatabase(chapter: {
 
 /**
  * Sync entire course object from Admin to Database strictly.
+ * Uses chapter ID (when available from DB) to avoid slug-mismatch mass-deletion.
  */
 export async function syncFullCourseToDatabase(course: Course): Promise<{ success: boolean; error?: string }> {
   try {
@@ -223,24 +224,48 @@ export async function syncFullCourseToDatabase(course: Course): Promise<{ succes
       return { success: false, error: cErr?.message || "فشل مزامنة المقرر" }
     }
 
-    // 2. Delete chapters that were removed by admin
+    // 2. Load existing chapters from DB to compare
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: existingChapters } = await (client.from("chapters") as any)
       .select("id, slug")
       .eq("course_id", dbCourse.id)
 
-    const currentSlugs = new Set(
-      course.lectures.map((lec, i) => `lec-${lec.number || i + 1}`)
-    )
+    // Build the set of slugs/ids we WILL upsert
+    // Strategy: use lec.id directly when it looks like a DB UUID (not "lec-..." or "custom-...")
+    const isDbUuid = (id: string) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
 
+    const getSlugForLecture = (lec: Course["lectures"][number], i: number): string => {
+      const num = typeof lec.number === "number" && lec.number > 0 ? lec.number : i + 1
+      return `lec-${num}`
+    }
+
+    // Build set of "identifiers" for current lectures (DB ids or slugs)
+    const currentChapterIds = new Set(
+      course.lectures.map((lec) => (isDbUuid(lec.id) ? lec.id : null)).filter(Boolean)
+    )
+    const currentSlugs = new Set(course.lectures.map((lec, i) => getSlugForLecture(lec, i)))
+
+    // Build a map from existing slug → existing chapter id (for reuse without delete)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const existingSlugToId = new Map<string, string>((existingChapters || []).map((ec: any) => [ec.slug, ec.id]))
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const existingIdToSlug = new Map<string, string>((existingChapters || []).map((ec: any) => [ec.id, ec.slug]))
+
+    // Delete only chapters that are NOT referenced by current lectures (either by id or slug)
     if (existingChapters && existingChapters.length > 0) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const toDelete = (existingChapters as any[])
-        .filter((ec) => !currentSlugs.has(ec.slug))
+        .filter((ec) => {
+          // Keep if its id is explicitly referenced
+          if (currentChapterIds.has(ec.id)) return false
+          // Keep if its slug matches current slugs
+          if (currentSlugs.has(ec.slug)) return false
+          return true
+        })
         .map((ec) => ec.id)
 
       if (toDelete.length > 0) {
-        // Cascade delete topics & resources of removed chapters
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: topicsToDelete } = await (client.from("topics") as any)
           .select("id")
@@ -255,146 +280,171 @@ export async function syncFullCourseToDatabase(course: Course): Promise<{ succes
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (client.from("chapters") as any).delete().in("id", toDelete)
+        // Cleanup maps
+        for (const id of toDelete) {
+          const slug = existingIdToSlug.get(id)
+          if (slug) existingSlugToId.delete(slug)
+          existingIdToSlug.delete(id)
+        }
       }
     }
 
     // 3. Upsert Lectures and ALL attached media (videos, pdfs, roadmaps, quiz)
     for (let i = 0; i < course.lectures.length; i++) {
       const lec = course.lectures[i]
-      const lecSlug = `lec-${lec.number || i + 1}`
+      const lecSlug = getSlugForLecture(lec, i)
+      const lecNumber = typeof lec.number === "number" && lec.number > 0 ? lec.number : i + 1
+
+      // Build upsert payload
+      // If lec.id is a real DB UUID, upsert by id (most reliable — avoids slug conflicts)
+      // If lec.id is a local id (lec-timestamp), upsert by course_id+slug conflict
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const chapterPayload: any = {
+        course_id: dbCourse.id,
+        slug: lecSlug,
+        position: lecNumber,
+        title: lec.title,
+        summary: lec.summary || "",
+        difficulty: 2,
+        status: "published",
+      }
+      if (isDbUuid(lec.id)) {
+        // Include the real DB id so Supabase does a targeted UPDATE
+        chapterPayload.id = lec.id
+      } else if (existingSlugToId.has(lecSlug)) {
+        // We know the existing DB id for this slug, pin it
+        chapterPayload.id = existingSlugToId.get(lecSlug)
+      }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: dbChapter } = await (client.from("chapters") as any)
+      const { data: dbChapter, error: chErr } = await (client.from("chapters") as any)
+        .upsert(chapterPayload, { onConflict: "course_id,slug" })
+        .select("id")
+        .single()
+
+      if (chErr || !dbChapter) {
+        console.error("[syncFullCourse] Chapter upsert failed:", chErr?.message)
+        continue
+      }
+
+      // Serialize quiz questions in mindmap_md for full DB persistence
+      const serializedQuiz = Array.isArray(lec.quiz) && lec.quiz.length > 0 ? JSON.stringify(lec.quiz) : null
+
+      // Upsert overview topic
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: dbTopic, error: topErr } = await (client.from("topics") as any)
         .upsert(
           {
-            course_id: dbCourse.id,
-            slug: lecSlug,
-            position: lec.number || i + 1,
+            chapter_id: dbChapter.id,
+            slug: `${lecSlug}-overview`,
+            position: 1,
             title: lec.title,
-            summary: lec.summary || "",
-            difficulty: 2,
+            content_md: lec.summary || "",
+            mindmap_md: serializedQuiz,
+            importance: 3,
             status: "published",
           },
-          { onConflict: "course_id,slug" }
+          { onConflict: "chapter_id,slug" }
         )
         .select("id")
         .single()
 
-      if (dbChapter) {
-        // Serialize quiz questions in mindmap_md for full DB persistence
-        const serializedQuiz = Array.isArray(lec.quiz) && lec.quiz.length > 0 ? JSON.stringify(lec.quiz) : null
+      if (topErr || !dbTopic) {
+        console.error("[syncFullCourse] Topic upsert failed:", topErr?.message)
+        continue
+      }
 
-        // Upsert overview topic
+      // Clear previous resources then re-insert fresh set
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (client.from("resources") as any).delete().eq("topic_id", dbTopic.id)
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const resourcesToInsert: any[] = []
+
+      // ALL Videos
+      const videos =
+        Array.isArray(lec.videos) && lec.videos.length > 0
+          ? lec.videos
+          : lec.videoUrl
+          ? [{ id: "v1", title: "فيديو الشرح الأساسي", url: lec.videoUrl }]
+          : []
+
+      videos.forEach((v, vIdx) => {
+        if (v.url && v.url.trim()) {
+          resourcesToInsert.push({
+            topic_id: dbTopic.id,
+            type: "video",
+            title: v.title || `فيديو ${vIdx + 1}`,
+            url: v.url.trim(),
+            source_name: v.source || "YouTube",
+            position: vIdx + 1,
+          })
+        }
+      })
+
+      // ALL PDFs
+      const pdfs =
+        Array.isArray(lec.pdfs) && lec.pdfs.length > 0
+          ? lec.pdfs
+          : lec.pdfUrl
+          ? [{ id: "p1", title: lec.pdfName || "سلايدات المحاضرة", url: lec.pdfUrl }]
+          : []
+
+      pdfs.forEach((p, pIdx) => {
+        if (p.url && p.url.trim()) {
+          resourcesToInsert.push({
+            topic_id: dbTopic.id,
+            type: "slide",
+            title: p.title || `ملف المحاضرة ${pIdx + 1}`,
+            url: p.url.trim(),
+            position: 10 + pIdx,
+          })
+        }
+      })
+
+      // ALL Roadmaps / Mindmaps
+      if (Array.isArray(lec.roadmaps)) {
+        lec.roadmaps.forEach((m, mIdx) => {
+          if (m.imageUrl && m.imageUrl.trim()) {
+            resourcesToInsert.push({
+              topic_id: dbTopic.id,
+              type: "roadmap",
+              title: m.title || `خريطة المفاهيم ${mIdx + 1}`,
+              url: m.imageUrl.trim(),
+              position: 20 + mIdx,
+            })
+          }
+        })
+      }
+
+      if (resourcesToInsert.length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: dbTopic } = await (client.from("topics") as any)
-          .upsert(
+        const { error: resErr } = await (client.from("resources") as any).insert(resourcesToInsert)
+        if (resErr) {
+          console.error("[syncFullCourse] Resource insert failed:", resErr.message, JSON.stringify(resourcesToInsert.map(r => ({ type: r.type, url: r.url?.substring(0, 80) }))))
+          return { success: false, error: `فشل حفظ الملفات المرفقة بالمحاضرة "${lec.title}": ${resErr.message}` }
+        }
+      }
+
+      // Upsert any custom sub-topics inside the lecture
+      if (Array.isArray(lec.topics)) {
+        for (let tIdx = 0; tIdx < lec.topics.length; tIdx++) {
+          const top = lec.topics[tIdx]
+          const topSlug = top.slug || `${lecSlug}-topic-${tIdx + 1}`
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (client.from("topics") as any).upsert(
             {
               chapter_id: dbChapter.id,
-              slug: `${lecSlug}-overview`,
-              position: 1,
-              title: lec.title,
-              content_md: lec.summary || "",
-              mindmap_md: serializedQuiz,
-              importance: 3,
+              slug: topSlug,
+              position: tIdx + 2,
+              title: top.title,
+              content_md: top.summary || "",
+              importance: top.importance || 3,
+              doctor_favorites: top.doctorNote ? [top.doctorNote] : [],
               status: "published",
             },
             { onConflict: "chapter_id,slug" }
           )
-          .select("id")
-          .single()
-
-        if (dbTopic) {
-          // Clear previous resources to prevent duplicates
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (client.from("resources") as any)
-            .delete()
-            .eq("topic_id", dbTopic.id)
-
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const resourcesToInsert: any[] = []
-
-          // 1. ALL Videos attached to lecture
-          const videos =
-            Array.isArray(lec.videos) && lec.videos.length > 0
-              ? lec.videos
-              : lec.videoUrl
-              ? [{ id: `v1`, title: "فيديو الشرح الأساسي", url: lec.videoUrl }]
-              : []
-
-          videos.forEach((v, vIdx) => {
-            if (v.url) {
-              resourcesToInsert.push({
-                topic_id: dbTopic.id,
-                type: "video",
-                title: v.title || `فيديو ${vIdx + 1}`,
-                url: v.url,
-                source_name: v.source || "YouTube",
-                position: vIdx + 1,
-              })
-            }
-          })
-
-          // 2. ALL PDFs attached to lecture
-          const pdfs =
-            Array.isArray(lec.pdfs) && lec.pdfs.length > 0
-              ? lec.pdfs
-              : lec.pdfUrl
-              ? [{ id: `p1`, title: lec.pdfName || "سلايدات المحاضرة", url: lec.pdfUrl }]
-              : []
-
-          pdfs.forEach((p, pIdx) => {
-            if (p.url) {
-              resourcesToInsert.push({
-                topic_id: dbTopic.id,
-                type: "slide",
-                title: p.title || `ملف المحاضرة ${pIdx + 1}`,
-                url: p.url,
-                position: 10 + pIdx,
-              })
-            }
-          })
-
-          // 3. ALL Roadmaps attached to lecture
-          if (Array.isArray(lec.roadmaps)) {
-            lec.roadmaps.forEach((m, mIdx) => {
-              if (m.imageUrl) {
-                resourcesToInsert.push({
-                  topic_id: dbTopic.id,
-                  type: "roadmap",
-                  title: m.title || `خريطة المفاهيم ${mIdx + 1}`,
-                  url: m.imageUrl,
-                  position: 20 + mIdx,
-                })
-              }
-            })
-          }
-
-          if (resourcesToInsert.length > 0) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (client.from("resources") as any).insert(resourcesToInsert)
-          }
-        }
-
-        // 4. Upsert any custom topics inside the lecture
-        if (Array.isArray(lec.topics)) {
-          for (let tIdx = 0; tIdx < lec.topics.length; tIdx++) {
-            const top = lec.topics[tIdx]
-            const topSlug = top.slug || `${lecSlug}-topic-${tIdx + 1}`
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (client.from("topics") as any).upsert(
-              {
-                chapter_id: dbChapter.id,
-                slug: topSlug,
-                position: tIdx + 2,
-                title: top.title,
-                content_md: top.summary || "",
-                importance: top.importance || 3,
-                doctor_favorites: top.doctorNote ? [top.doctorNote] : [],
-                status: "published",
-              },
-              { onConflict: "chapter_id,slug" }
-            )
-          }
         }
       }
     }

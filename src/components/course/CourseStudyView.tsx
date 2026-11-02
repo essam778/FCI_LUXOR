@@ -190,7 +190,8 @@ export function CourseStudyView({ course }: CourseStudyViewProps) {
   const toggleSection = (lectureId: string, section: "video" | "pdf" | "notes" | "topics" | "roadmap" | "quiz") => {
     setOpenSections((prev) => {
       const current = prev[lectureId] || {}
-      const currentlyOpen = current[section] !== undefined ? current[section] : (section === "video")
+      // Default is false (closed) for all sections — user must explicitly open
+      const currentlyOpen = current[section] !== undefined ? current[section] : false
       return {
         ...prev,
         [lectureId]: {
@@ -205,7 +206,8 @@ export function CourseStudyView({ course }: CourseStudyViewProps) {
     if (openSections[lectureId]?.[section] !== undefined) {
       return openSections[lectureId][section]
     }
-    return section === "video"
+    // No section auto-opens — user must click to expand
+    return false
   }
 
   // Which video is active per lecture

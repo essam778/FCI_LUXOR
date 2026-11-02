@@ -97,6 +97,12 @@ export function AdminDashboard({
   React.useEffect(() => {
     if (initialCourses) {
       setCoursesList(initialCourses)
+      // If there's an active workspace, refresh it from the new data
+      setActiveCourseWorkspace((prev) => {
+        if (!prev) return null
+        const fresh = initialCourses.find((c) => c.id === prev.id)
+        return fresh || prev
+      })
     }
     if (typeof window !== "undefined") {
       try {
@@ -270,16 +276,20 @@ export function AdminDashboard({
       syncFullCourseToDatabase(courseToSync)
         .then((res) => {
           if (res.success) {
-            setSavedStatus(`تم الحفظ والمزامنة السحابية لمادة "${courseToSync.code}" بنجاح في Supabase ✓`)
+            setSavedStatus(`✅ تم الحفظ والمزامنة السحابية لمادة "${courseToSync.code}" بنجاح`)
+            setTimeout(() => setSavedStatus(null), 4000)
           } else {
-            setSavedStatus(`تنبيه: تعذرت المزامنة مع Supabase: ${res.error}`)
+            const errMsg = `❌ خطأ في الحفظ: ${res.error}`
+            setSavedStatus(errMsg)
+            alert(errMsg)
+            setTimeout(() => setSavedStatus(null), 8000)
           }
         })
         .catch((err) => {
-          setSavedStatus(`خطأ في مزامنة السحابة: ${err instanceof Error ? err.message : "خطأ غير متوقع"}`)
-        })
-        .finally(() => {
-          setTimeout(() => setSavedStatus(null), 4000)
+          const errMsg = `❌ خطأ في مزامنة السحابة: ${err instanceof Error ? err.message : "خطأ غير متوقع"}`
+          setSavedStatus(errMsg)
+          alert(errMsg)
+          setTimeout(() => setSavedStatus(null), 8000)
         })
     }
   }
