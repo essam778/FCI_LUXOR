@@ -145,57 +145,20 @@ function getLectureQuizQuestions(lecture: LectureChapter): QuizQuestion[] {
   if (Array.isArray(lecture.quiz) && lecture.quiz.length > 0) {
     return lecture.quiz
   }
-  return [
-    {
-      id: `${lecture.id}-q1`,
-      question: `ما هو الهدف التعليمي الأساسي لمحاضرة "${lecture.title}"؟`,
-      options: [
-        "فهم المفاهيم الأساسية والتطبيق البرمجي السليم",
-        "حفظ الأكواد دون تطبيق عملي",
-        "تخطي شيتات المعمل والتركيز على النظري فقط",
-        "إهمال شروط الحدود وتعقيد الخوارزمية",
-      ],
-      correctIndex: 0,
-      explanation: "الهدف الأكاديمي دائماً هو الجمع بين الاستيعاب النظري والتطبيق البرمجي الصحيح وحل الشيتات.",
-    },
-    {
-      id: `${lecture.id}-q2`,
-      question: "وفقاً لتوجيهات أساتذة المادة، ما الذي يجب الانتباه له في الامتحانات وشيتات الدكتور؟",
-      options: [
-        "التركيز على شروط الحدود (Boundary Cases) والتعقيد الحسابي والخطوات المنطقية",
-        "إهمال المدخلات الخاطئة وحالات الاختبار الاستثنائية",
-        "كتابة حلول عشوائية دون ترتيب",
-        "تجاهل خطوات الحل النموذجية",
-      ],
-      correctIndex: 0,
-      explanation: "أساتذة حاسبات بالأقصر يهتمون بحالات الاختبار الدقيقة والشروط الحدية في ورقة الإجابة.",
-    },
-  ]
+  return []
 }
 
 export function CourseStudyView({ course }: CourseStudyViewProps) {
-  // Reactive course state that merges live edits from admin localStorage
+  // Course state strictly from database
   const [activeCourse, setActiveCourse] = React.useState<Course>(course)
 
   React.useEffect(() => {
     setActiveCourse(course)
     if (typeof window !== "undefined") {
       try {
-        const stored = localStorage.getItem("fci_admin_courses_v3")
-        if (stored) {
-          const parsed = JSON.parse(stored)
-          if (Array.isArray(parsed)) {
-            const found = parsed.find(
-              (c: Course) =>
-                c.id === course.id ||
-                c.slug?.toLowerCase() === course.slug?.toLowerCase() ||
-                c.code?.toLowerCase() === course.code?.toLowerCase()
-            )
-            if (found) {
-              setActiveCourse(found)
-            }
-          }
-        }
+        localStorage.removeItem("fci_admin_courses")
+        localStorage.removeItem("fci_admin_courses_v2")
+        localStorage.removeItem("fci_admin_courses_v3")
       } catch {
         // ignore
       }

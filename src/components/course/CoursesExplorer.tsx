@@ -22,7 +22,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
   ACADEMIC_YEARS,
-  COURSES_DATA,
   type Course,
 } from "@/data/coursesData"
 
@@ -60,42 +59,18 @@ export function CoursesExplorer({ userLevel = 1, initialCourses }: CoursesExplor
   const [currentView, setCurrentView] = React.useState<"semesters_boxes" | "semester_details">("semesters_boxes")
   const [activeSemester, setActiveSemester] = React.useState<1 | 2>(1)
 
-  // Courses list with live server data as base, merged gracefully with any local edits
-  const [allCourses, setAllCourses] = React.useState<Course[]>(initialCourses || COURSES_DATA)
+  // Courses list strictly from database props
+  const [allCourses, setAllCourses] = React.useState<Course[]>(initialCourses || [])
 
   React.useEffect(() => {
-    if (initialCourses && initialCourses.length > 0) {
+    if (initialCourses) {
       setAllCourses(initialCourses)
     }
-  }, [initialCourses])
-
-  React.useEffect(() => {
     if (typeof window !== "undefined") {
       try {
         localStorage.removeItem("fci_admin_courses")
         localStorage.removeItem("fci_admin_courses_v2")
-        const stored = localStorage.getItem("fci_admin_courses_v3")
-        if (stored) {
-          const parsed = JSON.parse(stored)
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setAllCourses((current) => {
-              const base = initialCourses && initialCourses.length > 0 ? initialCourses : current
-              return base.map((c) => {
-                const localMatch = parsed.find(
-                  (lc: Course) => lc.id === c.id || lc.slug === c.slug || lc.code === c.code
-                )
-                if (localMatch && (localMatch.lectures?.length || 0) >= (c.lectures?.length || 0)) {
-                  return {
-                    ...c,
-                    ...localMatch,
-                    imageUrl: localMatch.imageUrl || c.imageUrl,
-                  }
-                }
-                return c
-              })
-            })
-          }
-        }
+        localStorage.removeItem("fci_admin_courses_v3")
       } catch {
         // ignore
       }
@@ -146,7 +121,6 @@ export function CoursesExplorer({ userLevel = 1, initialCourses }: CoursesExplor
     const parsed = parseCourseTitle(course.title)
     const coverImg =
       course.imageUrl ||
-      COURSES_DATA.find((o) => o.id === course.id || o.slug === course.slug || o.code === course.code)?.imageUrl ||
       "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80"
 
     const levelText =

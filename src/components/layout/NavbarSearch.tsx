@@ -3,13 +3,30 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 import { Search, BookOpen, Layers, X } from "lucide-react"
-import { COURSES_DATA } from "@/data/coursesData"
+import type { Course } from "@/data/coursesData"
 
 export function NavbarSearch() {
   const [query, setQuery] = React.useState("")
   const [isOpen, setIsOpen] = React.useState(false)
+  const [courses, setCourses] = React.useState<Course[]>([])
   const router = useRouter()
   const searchRef = React.useRef<HTMLDivElement>(null)
+
+  // Fetch live courses on demand
+  const loadCourses = React.useCallback(async () => {
+    if (courses.length > 0) return
+    try {
+      const res = await fetch("/api/courses")
+      if (res.ok) {
+        const data = await res.json()
+        if (Array.isArray(data)) {
+          setCourses(data)
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [courses.length])
 
   // Keyboard shortcut Ctrl+K / Cmd+K
   React.useEffect(() => {
@@ -17,6 +34,7 @@ export function NavbarSearch() {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault()
         setIsOpen(true)
+        loadCourses()
         const inputEl = document.getElementById("navbar-search-input")
         inputEl?.focus()
       }
@@ -26,7 +44,7 @@ export function NavbarSearch() {
     }
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [])
+  }, [loadCourses])
 
   // Close on outside click
   React.useEffect(() => {
@@ -40,43 +58,43 @@ export function NavbarSearch() {
   }, [])
 
   const results = React.useMemo(() => {
-    if (!query.trim()) return []
+    if (!query.trim() || courses.length === 0) return []
     const q = query.toLowerCase()
     const matches: Array<{ type: "course" | "topic"; title: string; subtitle: string; slug: string }> = []
 
-    for (const course of COURSES_DATA) {
+    for (const course of courses) {
       if (course.title.toLowerCase().includes(q) || course.code.toLowerCase().includes(q)) {
         matches.push({
           type: "course",
           title: course.title,
           subtitle: `${course.code} • الفرقة ${course.level} ترم ${course.semester}`,
-          slug: `/courses?q=${encodeURIComponent(course.title)}`,
+          slug: `/courses/${course.slug || course.id}`,
         })
       }
 
-      for (const lec of course.lectures) {
+      for (const lec of course.lectures || []) {
         if (lec.title.toLowerCase().includes(q)) {
           matches.push({
             type: "topic",
             title: lec.title,
             subtitle: `${course.title} • ${course.code}`,
-            slug: `/courses?q=${encodeURIComponent(lec.title)}`,
+            slug: `/courses/${course.slug || course.id}`,
           })
         }
-        for (const topic of lec.topics) {
+        for (const topic of lec.topics || []) {
           if (topic.title.toLowerCase().includes(q)) {
             matches.push({
               type: "topic",
               title: topic.title,
               subtitle: `${course.title} • محاضرة ${lec.number}`,
-              slug: `/courses?q=${encodeURIComponent(topic.title)}`,
+              slug: `/courses/${course.slug || course.id}`,
             })
           }
         }
       }
     }
     return matches.slice(0, 6)
-  }, [query])
+  }, [query, courses])
 
   const handleSelect = (slug: string) => {
     setIsOpen(false)
@@ -99,58 +117,62 @@ export function NavbarSearch() {
           id="navbar-search-input"
           type="text"
           value={query}
+          onFocus={() => {
+            setIsOpen(true)
+            loadCourses()
+          }}
           onChange={(e) => {
             setQuery(e.target.value)
             setIsOpen(true)
+            loadCourses()
           }}
-          onFocus={() => setIsOpen(true)}
-          placeholder="ابحث عن مادة، محاضرة، أو سؤال..."
-          className="w-full h-9 rounded-lg border border-border/80 bg-card/50 ps-9 pe-16 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/60 transition-all"
+          placeholder="ابحث عن مقرر أو موضوع... (Ctrl+K)"
+          className="w-full h-9 ps-9 pe-9 text-xs rounded-xl bg-muted/60 hover:bg-muted focus:bg-background border border-border/70 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary text-foreground transition-all placeholder:text-muted-foreground/70"
+          dir="rtl"
         />
-        <div className="absolute end-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
-          {query ? (
-            <button
-              type="button"
-              onClick={() => setQuery("")}
-              className="text-muted-foreground hover:text-foreground cursor-pointer"
-            >
-              <X className="size-3.5" />
-            </button>
-          ) : (
-            <kbd className="hidden sm:inline-flex h-5 items-center gap-0.5 rounded border border-border/80 bg-muted/50 px-1.5 font-mono text-[10px] font-medium text-muted-foreground select-none pointer-events-none">
-              ⌘K
-            </kbd>
-          )}
-        </div>
-      </form>
-
-      {/* Live Suggestions Dropdown */}
-      {isOpen && results.length > 0 && (
-        <div className="absolute top-full mt-2 w-full min-w-[340px] rounded-xl border border-border/80 bg-card/95 backdrop-blur-md p-2 shadow-xl z-50 space-y-1 animate-in fade-in-50 zoom-in-95 duration-150">
-          <div className="px-2.5 py-1 text-[11px] font-bold text-muted-foreground">نتائج البحث الفورية:</div>
-          {results.map((res, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => handleSelect(res.slug)}
-              className="w-full flex items-start gap-2.5 p-2 rounded-lg text-start hover:bg-muted/60 transition-colors cursor-pointer group"
-            >
-              <div className="size-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                {res.type === "course" ? <BookOpen className="size-3.5" /> : <Layers className="size-3.5" />}
-              </div>
-              <div className="overflow-hidden">
-                <div className="text-xs font-bold text-foreground truncate">{res.title}</div>
-                <div className="text-[10px] text-muted-foreground truncate">{res.subtitle}</div>
-              </div>
-            </button>
-          ))}
+        {query && (
           <button
             type="button"
-            onClick={handleSubmit}
-            className="w-full pt-2 pb-1 text-center text-xs font-bold text-primary hover:underline border-t border-border/50 cursor-pointer"
+            onClick={() => {
+              setQuery("")
+              setIsOpen(false)
+            }}
+            className="absolute end-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
           >
-            عرض كافة النتائج في صفحة المقررات ←
+            <X className="size-3.5" />
           </button>
+        )}
+      </form>
+
+      {/* Dropdown Results */}
+      {isOpen && query.trim() && (
+        <div className="absolute top-full mt-2 w-full min-w-[280px] sm:min-w-[340px] end-0 rounded-2xl border border-border bg-card/95 backdrop-blur-xl shadow-2xl p-2 z-50 text-start animate-in fade-in-50 zoom-in-95 duration-100">
+          {results.length > 0 ? (
+            <div className="space-y-1">
+              <div className="px-2 py-1 text-[10px] font-bold text-muted-foreground uppercase">
+                نتائج البحث المباشرة
+              </div>
+              {results.map((res, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => handleSelect(res.slug)}
+                  className="p-2.5 rounded-xl hover:bg-accent cursor-pointer transition-colors flex items-center justify-between gap-2"
+                >
+                  <div className="space-y-0.5 min-w-0 flex-1">
+                    <p className="text-xs font-bold text-foreground truncate">{res.title}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">{res.subtitle}</p>
+                  </div>
+                  <div className="size-6 rounded-lg bg-muted flex items-center justify-center shrink-0 text-muted-foreground">
+                    {res.type === "course" ? <BookOpen className="size-3" /> : <Layers className="size-3" />}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-4 text-center text-xs text-muted-foreground">
+              لا توجد نتائج مطابقة لـ &quot;{query}&quot;
+            </div>
+          )}
         </div>
       )}
     </div>

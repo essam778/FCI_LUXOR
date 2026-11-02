@@ -37,9 +37,8 @@ import type { AdminMember } from "@/lib/actions/adminMembers"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { dispatchRealNotification } from "@/lib/notifications"
-import { syncFullCourseToDatabase, uploadCourseCoverAction } from "@/lib/actions/courses"
+import { syncFullCourseToDatabase, uploadCourseCoverAction, deleteCourseFromDatabase } from "@/lib/actions/courses"
 import {
-  COURSES_DATA,
   ACADEMIC_YEARS,
   type Course,
   type LectureChapter,
@@ -91,68 +90,22 @@ export function AdminDashboard({
 
   const [preselectedNotifyMember, setPreselectedNotifyMember] = React.useState<AdminMember | null>(null)
 
-  // Courses state: Uses live Supabase data as single source of truth, gracefully merged with local changes
-  const [coursesList, setCoursesList] = React.useState<Course[]>(() => {
-    const baseCourses = initialCourses && initialCourses.length > 0 ? initialCourses : COURSES_DATA
+  // Courses state: Uses live Supabase data as the absolute single source of truth
+  const [coursesList, setCoursesList] = React.useState<Course[]>(initialCourses || [])
+
+  // Update courses when initialCourses changes and clear any stale legacy localStorage
+  React.useEffect(() => {
+    if (initialCourses) {
+      setCoursesList(initialCourses)
+    }
     if (typeof window !== "undefined") {
       try {
         localStorage.removeItem("fci_admin_courses")
         localStorage.removeItem("fci_admin_courses_v2")
-        const stored = localStorage.getItem("fci_admin_courses_v3")
-        if (stored) {
-          const parsed = JSON.parse(stored) as Course[]
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return baseCourses.map((bc) => {
-              const localMatch = parsed.find(
-                (lc) => lc.id === bc.id || lc.code === bc.code || lc.slug === bc.slug
-              )
-              if (localMatch && (localMatch.lectures?.length || 0) >= (bc.lectures?.length || 0)) {
-                return {
-                  ...bc,
-                  ...localMatch,
-                  imageUrl: localMatch.imageUrl || bc.imageUrl,
-                }
-              }
-              return bc
-            })
-          }
-        }
+        localStorage.removeItem("fci_admin_courses_v3")
       } catch {
         // ignore
       }
-    }
-    return baseCourses
-  })
-
-  // Auto-sync any local courses that have more lectures than cloud database
-  React.useEffect(() => {
-    if (typeof window === "undefined") return
-    try {
-      const stored = localStorage.getItem("fci_admin_courses_v3")
-      if (!stored) return
-      const parsed = JSON.parse(stored) as Course[]
-      if (!Array.isArray(parsed)) return
-
-      const needSync = parsed.filter((localC) => {
-        const dbC = initialCourses?.find(
-          (c) => c.id === localC.id || c.code === localC.code || c.slug === localC.slug
-        )
-        return !dbC || (localC.lectures?.length || 0) > (dbC.lectures?.length || 0)
-      })
-
-      if (needSync.length > 0) {
-        Promise.all(needSync.map((c) => syncFullCourseToDatabase(c)))
-          .then((results) => {
-            const successCount = results.filter((r) => r.success).length
-            if (successCount > 0) {
-              setSavedStatus(`تمت مزامنة ${successCount} مقرر ومحاضرات محلية تلقائياً مع السحابة (Supabase) ✓`)
-              setTimeout(() => setSavedStatus(null), 4000)
-            }
-          })
-          .catch((e) => console.warn("[Auto-Sync error]", e))
-      }
-    } catch {
-      // ignore
     }
   }, [initialCourses])
 
@@ -309,12 +262,9 @@ export function AdminDashboard({
   const [resTitle, setResTitle] = React.useState("")
   const [resUrl, setResUrl] = React.useState("")
 
-  // Persist courses to localStorage and sync with Supabase
+  // Persist courses directly to Supabase and update state
   const persistCourses = (updated: Course[], courseToSync?: Course) => {
     setCoursesList(updated)
-    if (typeof window !== "undefined") {
-      localStorage.setItem("fci_admin_courses_v3", JSON.stringify(updated))
-    }
     if (courseToSync) {
       setSavedStatus(`جاري حفظ ومزامنة مادة "${courseToSync.title}" مع السحابة (Supabase)...`)
       syncFullCourseToDatabase(courseToSync)
@@ -322,7 +272,7 @@ export function AdminDashboard({
           if (res.success) {
             setSavedStatus(`تم الحفظ والمزامنة السحابية لمادة "${courseToSync.code}" بنجاح في Supabase ✓`)
           } else {
-            setSavedStatus(`تنبيه: تم الحفظ محلياً لكن تعذرت المزامنة مع Supabase: ${res.error}`)
+            setSavedStatus(`تنبيه: تعذرت المزامنة مع Supabase: ${res.error}`)
           }
         })
         .catch((err) => {
@@ -418,14 +368,26 @@ export function AdminDashboard({
   }
 
   // Delete Course
-  const handleDeleteCourse = (courseId: string) => {
-    if (confirm("Are you sure you want to permanently delete this course and all associated lectures?")) {
-      const updated = coursesList.filter((c) => c.id !== courseId)
-      persistCourses(updated)
-      if (activeCourseWorkspace && activeCourseWorkspace.id === courseId) {
-        setActiveCourseWorkspace(null)
+  const handleDeleteCourse = async (courseId: string) => {
+    if (!confirm("هل أنت متأكد من رغبتك في حذف هذا المقرر نهائياً وجميع محاضراته من قاعدة بيانات Supabase؟")) {
+      return
+    }
+    setSavedStatus("جاري حذف المقرر من قاعدة البيانات السحابية...")
+    try {
+      const res = await deleteCourseFromDatabase(courseId)
+      if (res.success) {
+        const updated = coursesList.filter((c) => c.id !== courseId)
+        setCoursesList(updated)
+        if (activeCourseWorkspace && activeCourseWorkspace.id === courseId) {
+          setActiveCourseWorkspace(null)
+        }
+        setSavedStatus("تم حذف المقرر وجميع محتوياته نهائياً من Supabase بنجاح ✓")
+      } else {
+        alert(res.error || "فشل حذف المقرر من قاعدة البيانات")
       }
-      setSavedStatus("Course removed successfully.")
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "خطأ أثناء الحذف")
+    } finally {
       setTimeout(() => setSavedStatus(null), 3000)
     }
   }

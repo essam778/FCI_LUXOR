@@ -82,6 +82,66 @@ export async function saveCourseToDatabase(course: {
 }
 
 /**
+ * Permanently delete a course and all its chapters, topics, and resources from Supabase.
+ */
+export async function deleteCourseFromDatabase(courseIdOrSlug: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { supabase } = await assertAdminCaller()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client: any = createAdminClient() || supabase
+
+    // Find course by id or slug
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: targetCourse } = await (client.from("courses") as any)
+      .select("id, slug")
+      .or(`id.eq.${courseIdOrSlug},slug.eq.${courseIdOrSlug}`)
+      .single()
+
+    const realId = targetCourse?.id || courseIdOrSlug
+
+    // 1. Get all chapters to delete topics & resources
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: chapters } = await (client.from("chapters") as any)
+      .select("id")
+      .eq("course_id", realId)
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const chapterIds = (chapters || []).map((ch: any) => ch.id)
+    if (chapterIds.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: topics } = await (client.from("topics") as any)
+        .select("id")
+        .in("chapter_id", chapterIds)
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const topicIds = (topics || []).map((t: any) => t.id)
+      if (topicIds.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (client.from("resources") as any).delete().in("topic_id", topicIds)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (client.from("topics") as any).delete().in("id", topicIds)
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (client.from("chapters") as any).delete().in("id", chapterIds)
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (client.from("courses") as any).delete().eq("id", realId)
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath("/courses")
+    revalidatePath("/admin")
+    revalidatePath("/")
+    return { success: true }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "خطأ أثناء حذف المقرر"
+    return { success: false, error: msg }
+  }
+}
+
+/**
  * Save or update a lecture/chapter in Supabase database.
  */
 export async function saveChapterToDatabase(chapter: {
@@ -132,7 +192,7 @@ export async function saveChapterToDatabase(chapter: {
 }
 
 /**
- * Sync entire course object from Admin to Database.
+ * Sync entire course object from Admin to Database strictly.
  */
 export async function syncFullCourseToDatabase(course: Course): Promise<{ success: boolean; error?: string }> {
   try {
@@ -180,14 +240,25 @@ export async function syncFullCourseToDatabase(course: Course): Promise<{ succes
         .map((ec) => ec.id)
 
       if (toDelete.length > 0) {
+        // Cascade delete topics & resources of removed chapters
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (client.from("chapters") as any)
-          .delete()
-          .in("id", toDelete)
+        const { data: topicsToDelete } = await (client.from("topics") as any)
+          .select("id")
+          .in("chapter_id", toDelete)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const topicIds = (topicsToDelete || []).map((t: any) => t.id)
+        if (topicIds.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (client.from("resources") as any).delete().in("topic_id", topicIds)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (client.from("topics") as any).delete().in("id", topicIds)
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (client.from("chapters") as any).delete().in("id", toDelete)
       }
     }
 
-    // 3. Upsert Lectures and ALL attached media (videos, pdfs, roadmaps)
+    // 3. Upsert Lectures and ALL attached media (videos, pdfs, roadmaps, quiz)
     for (let i = 0; i < course.lectures.length; i++) {
       const lec = course.lectures[i]
       const lecSlug = `lec-${lec.number || i + 1}`
@@ -210,6 +281,9 @@ export async function syncFullCourseToDatabase(course: Course): Promise<{ succes
         .single()
 
       if (dbChapter) {
+        // Serialize quiz questions in mindmap_md for full DB persistence
+        const serializedQuiz = Array.isArray(lec.quiz) && lec.quiz.length > 0 ? JSON.stringify(lec.quiz) : null
+
         // Upsert overview topic
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: dbTopic } = await (client.from("topics") as any)
@@ -220,6 +294,7 @@ export async function syncFullCourseToDatabase(course: Course): Promise<{ succes
               position: 1,
               title: lec.title,
               content_md: lec.summary || "",
+              mindmap_md: serializedQuiz,
               importance: 3,
               status: "published",
             },
@@ -299,11 +374,34 @@ export async function syncFullCourseToDatabase(course: Course): Promise<{ succes
             await (client.from("resources") as any).insert(resourcesToInsert)
           }
         }
+
+        // 4. Upsert any custom topics inside the lecture
+        if (Array.isArray(lec.topics)) {
+          for (let tIdx = 0; tIdx < lec.topics.length; tIdx++) {
+            const top = lec.topics[tIdx]
+            const topSlug = top.slug || `${lecSlug}-topic-${tIdx + 1}`
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (client.from("topics") as any).upsert(
+              {
+                chapter_id: dbChapter.id,
+                slug: topSlug,
+                position: tIdx + 2,
+                title: top.title,
+                content_md: top.summary || "",
+                importance: top.importance || 3,
+                doctor_favorites: top.doctorNote ? [top.doctorNote] : [],
+                status: "published",
+              },
+              { onConflict: "chapter_id,slug" }
+            )
+          }
+        }
       }
     }
 
     revalidatePath("/courses")
     revalidatePath(`/courses/${course.slug}`)
+    revalidatePath(`/courses/${course.code}`)
     revalidatePath("/")
     revalidatePath("/admin")
     return { success: true }

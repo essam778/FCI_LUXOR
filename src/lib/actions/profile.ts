@@ -63,7 +63,7 @@ export async function updateProfile(
     if (avatarData) {
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (supabase.from("user_avatars") as any).upsert(
+        await (supabase as any).from("user_avatars").upsert(
           {
             user_id: user.id,
             image_data: avatarData,
