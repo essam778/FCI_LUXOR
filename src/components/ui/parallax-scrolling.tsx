@@ -12,7 +12,7 @@ interface ParallaxSectionProps {
 }
 
 export function ParallaxComponent({
-  title = "FCI Luxor Academic Hub",
+  title = "STUDY++ Academic Hub",
   subtitle = "Next-Generation Computer Science Education",
   className = "",
 }: ParallaxSectionProps) {

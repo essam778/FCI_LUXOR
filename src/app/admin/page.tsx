@@ -5,8 +5,8 @@ import { getCoursesList } from "@/lib/queries/courses"
 import { AdminDashboard } from "@/components/admin/AdminDashboard"
 
 export const metadata: Metadata = {
-  title: "Admin Control Center | FCI Luxor",
-  description: "Executive administrative portal and curriculum management system for FCI Luxor.",
+  title: "Admin Control Center | STUDY++",
+  description: "Executive administrative portal and curriculum management system for STUDY++.",
 }
 
 export default async function AdminPage() {

@@ -1,7 +1,7 @@
 import * as React from "react"
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
-import { getCourseBySlug, getCoursesList } from "@/lib/queries/courses"
+import { getCourseBySlug } from "@/lib/queries/courses"
 import { CourseStudyView } from "@/components/course/CourseStudyView"
 
 interface CoursePageProps {
@@ -10,7 +10,8 @@ interface CoursePageProps {
   }>
 }
 
-export const revalidate = 60
+export const dynamic = "force-dynamic"
+export const revalidate = 0
 
 export async function generateMetadata({ params }: CoursePageProps): Promise<Metadata> {
   const { courseSlug } = await params
@@ -31,13 +32,6 @@ export async function generateMetadata({ params }: CoursePageProps): Promise<Met
       type: "article",
     },
   }
-}
-
-export async function generateStaticParams() {
-  const courses = await getCoursesList()
-  return courses.map((c) => ({
-    courseSlug: c.slug,
-  }))
 }
 
 export default async function SingleCoursePage({ params }: CoursePageProps) {

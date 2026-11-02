@@ -9,7 +9,8 @@ export const metadata: Metadata = {
   description: "استعرض مقررات كليات الحاسبات والمعلومات مقسمة حسب الفرق الدراسية والفصول مع تفاصيل المحاضرات والموضوعات.",
 }
 
-export const revalidate = 60
+export const dynamic = "force-dynamic"
+export const revalidate = 0
 
 export default async function CoursesPage() {
   let userLevel: number = 1

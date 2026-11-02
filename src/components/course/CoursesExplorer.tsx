@@ -60,8 +60,14 @@ export function CoursesExplorer({ userLevel = 1, initialCourses }: CoursesExplor
   const [currentView, setCurrentView] = React.useState<"semesters_boxes" | "semester_details">("semesters_boxes")
   const [activeSemester, setActiveSemester] = React.useState<1 | 2>(1)
 
-  // Courses list with local persistence support using v3 key
+  // Courses list with live server data as base, merged gracefully with any local edits
   const [allCourses, setAllCourses] = React.useState<Course[]>(initialCourses || COURSES_DATA)
+
+  React.useEffect(() => {
+    if (initialCourses && initialCourses.length > 0) {
+      setAllCourses(initialCourses)
+    }
+  }, [initialCourses])
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {
@@ -72,26 +78,29 @@ export function CoursesExplorer({ userLevel = 1, initialCourses }: CoursesExplor
         if (stored) {
           const parsed = JSON.parse(stored)
           if (Array.isArray(parsed) && parsed.length > 0) {
-            // Keep only current official courses plus courses explicitly created by admin
-            const valid = parsed.filter(
-              (c: Course) =>
-                c.id.startsWith("admin-") ||
-                c.id.startsWith("custom-") ||
-                COURSES_DATA.some(
-                  (official) =>
-                    official.id === c.id ||
-                    official.slug === c.slug ||
-                    official.code === c.code
+            setAllCourses((current) => {
+              const base = initialCourses && initialCourses.length > 0 ? initialCourses : current
+              return base.map((c) => {
+                const localMatch = parsed.find(
+                  (lc: Course) => lc.id === c.id || lc.slug === c.slug || lc.code === c.code
                 )
-            )
-            setAllCourses(valid)
+                if (localMatch && (localMatch.lectures?.length || 0) >= (c.lectures?.length || 0)) {
+                  return {
+                    ...c,
+                    ...localMatch,
+                    imageUrl: localMatch.imageUrl || c.imageUrl,
+                  }
+                }
+                return c
+              })
+            })
           }
         }
       } catch {
         // ignore
       }
     }
-  }, [])
+  }, [initialCourses])
 
   const currentYearObj =
     ACADEMIC_YEARS.find((y) => y.level === selectedYear) || ACADEMIC_YEARS[0]

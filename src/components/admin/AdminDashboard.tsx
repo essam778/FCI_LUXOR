@@ -29,7 +29,6 @@ import {
   LayoutDashboard,
   Database,
   UploadCloud,
-  RefreshCw,
 } from "lucide-react"
 
 import { AdminMembersTab } from "./AdminMembersTab"
@@ -903,7 +902,7 @@ export function AdminDashboard({
             </div>
             <div>
               <div className="text-base font-black tracking-tight text-foreground flex items-center gap-1.5">
-                <span>FCI Luxor</span>
+                <span>STUDY++</span>
                 <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary font-bold">
                   PRO
                 </span>
