@@ -2214,13 +2214,25 @@ export function AdminDashboard({ adminEmail }: { adminEmail: string }) {
                             ({v.url})
                           </span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteVideoFromEdit(v.id)}
-                          className="text-muted-foreground hover:text-destructive p-1"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <a
+                            href={v.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sky-500 hover:text-sky-400 p-1 hover:bg-sky-500/10 rounded-md transition-colors"
+                            title="Open / Preview video stream"
+                          >
+                            <ExternalLink className="size-3.5" />
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteVideoFromEdit(v.id)}
+                            className="text-muted-foreground hover:text-destructive p-1 hover:bg-destructive/10 rounded-md transition-colors"
+                            title="Delete video"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -2477,37 +2489,55 @@ export function AdminDashboard({ adminEmail }: { adminEmail: string }) {
                       )}
                     </div>
 
-                    <Input
+                    <textarea
                       value={quizFormQuestion}
                       onChange={(e) => setQuizFormQuestion(e.target.value)}
-                      placeholder='Question text (e.g. What is the time complexity of "Binary Search"?)'
-                      className="text-xs bg-muted/20 h-9"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault()
+                        }
+                      }}
+                      placeholder='Question text (e.g. What does cout << "Hello World"; output?)'
+                      rows={2}
+                      className="w-full rounded-xl border border-input bg-muted/20 p-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary font-mono"
                     />
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <Input
                         value={quizFormOpt0}
                         onChange={(e) => setQuizFormOpt0(e.target.value)}
-                        placeholder="Option 1 (e.g. O(log n))..."
-                        className="text-xs bg-muted/20 h-9"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") e.preventDefault()
+                        }}
+                        placeholder='Option 1 (e.g. "Hello World")...'
+                        className="text-xs bg-muted/20 h-9 font-mono"
                       />
                       <Input
                         value={quizFormOpt1}
                         onChange={(e) => setQuizFormOpt1(e.target.value)}
-                        placeholder="Option 2 (e.g. O(n))..."
-                        className="text-xs bg-muted/20 h-9"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") e.preventDefault()
+                        }}
+                        placeholder="Option 2 (e.g. O(log n))..."
+                        className="text-xs bg-muted/20 h-9 font-mono"
                       />
                       <Input
                         value={quizFormOpt2}
                         onChange={(e) => setQuizFormOpt2(e.target.value)}
-                        placeholder="Option 3 (e.g. O(1))..."
-                        className="text-xs bg-muted/20 h-9"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") e.preventDefault()
+                        }}
+                        placeholder="Option 3 (e.g. Compile Error)..."
+                        className="text-xs bg-muted/20 h-9 font-mono"
                       />
                       <Input
                         value={quizFormOpt3}
                         onChange={(e) => setQuizFormOpt3(e.target.value)}
-                        placeholder="Option 4 (e.g. O(n^2))..."
-                        className="text-xs bg-muted/20 h-9"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") e.preventDefault()
+                        }}
+                        placeholder="Option 4 (e.g. None of the above)..."
+                        className="text-xs bg-muted/20 h-9 font-mono"
                       />
                     </div>
 
@@ -2535,7 +2565,10 @@ export function AdminDashboard({ adminEmail }: { adminEmail: string }) {
                         <Input
                           value={quizFormExplanation}
                           onChange={(e) => setQuizFormExplanation(e.target.value)}
-                          placeholder="Reason why this choice is correct..."
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") e.preventDefault()
+                          }}
+                          placeholder='Reason why this choice is correct (e.g. Strings in C++ use "" quotes)...'
                           className="text-xs bg-muted/20 h-8"
                         />
                       </div>

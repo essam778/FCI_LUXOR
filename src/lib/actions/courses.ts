@@ -140,7 +140,7 @@ export async function syncFullCourseToDatabase(course: Course): Promise<{ succes
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const client: any = createAdminClient() || supabase
 
-    // 1. Upsert Course
+    // 1. Upsert Course with cover image
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: dbCourse, error: cErr } = await (client.from("courses") as any)
       .upsert(
@@ -152,6 +152,7 @@ export async function syncFullCourseToDatabase(course: Course): Promise<{ succes
           level: course.level,
           semester: course.semester,
           status: course.status || "published",
+          image_url: course.imageUrl,
         },
         { onConflict: "slug" }
       )
@@ -162,7 +163,31 @@ export async function syncFullCourseToDatabase(course: Course): Promise<{ succes
       return { success: false, error: cErr?.message || "فشل مزامنة المقرر" }
     }
 
-    // 2. Upsert Lectures
+    // 2. Delete chapters that were removed by admin
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: existingChapters } = await (client.from("chapters") as any)
+      .select("id, slug")
+      .eq("course_id", dbCourse.id)
+
+    const currentSlugs = new Set(
+      course.lectures.map((lec, i) => `lec-${lec.number || i + 1}`)
+    )
+
+    if (existingChapters && existingChapters.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const toDelete = (existingChapters as any[])
+        .filter((ec) => !currentSlugs.has(ec.slug))
+        .map((ec) => ec.id)
+
+      if (toDelete.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (client.from("chapters") as any)
+          .delete()
+          .in("id", toDelete)
+      }
+    }
+
+    // 3. Upsert Lectures and ALL attached media (videos, pdfs, roadmaps)
     for (let i = 0; i < course.lectures.length; i++) {
       const lec = course.lectures[i]
       const lecSlug = `lec-${lec.number || i + 1}`
@@ -175,7 +200,7 @@ export async function syncFullCourseToDatabase(course: Course): Promise<{ succes
             slug: lecSlug,
             position: lec.number || i + 1,
             title: lec.title,
-            summary: lec.summary,
+            summary: lec.summary || "",
             difficulty: 2,
             status: "published",
           },
@@ -185,7 +210,7 @@ export async function syncFullCourseToDatabase(course: Course): Promise<{ succes
         .single()
 
       if (dbChapter) {
-        // Upsert default topic
+        // Upsert overview topic
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: dbTopic } = await (client.from("topics") as any)
           .upsert(
@@ -194,7 +219,7 @@ export async function syncFullCourseToDatabase(course: Course): Promise<{ succes
               slug: `${lecSlug}-overview`,
               position: 1,
               title: lec.title,
-              content_md: lec.summary,
+              content_md: lec.summary || "",
               importance: 3,
               status: "published",
             },
@@ -204,33 +229,83 @@ export async function syncFullCourseToDatabase(course: Course): Promise<{ succes
           .single()
 
         if (dbTopic) {
-          // Upsert video resource if exists
-          if (lec.videoUrl) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (client.from("resources") as any).insert({
-              topic_id: dbTopic.id,
-              type: "video",
-              title: "فيديو الشرح الأساسي",
-              url: lec.videoUrl,
-              position: 1,
+          // Clear previous resources to prevent duplicates
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (client.from("resources") as any)
+            .delete()
+            .eq("topic_id", dbTopic.id)
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const resourcesToInsert: any[] = []
+
+          // 1. ALL Videos attached to lecture
+          const videos =
+            Array.isArray(lec.videos) && lec.videos.length > 0
+              ? lec.videos
+              : lec.videoUrl
+              ? [{ id: `v1`, title: "فيديو الشرح الأساسي", url: lec.videoUrl }]
+              : []
+
+          videos.forEach((v, vIdx) => {
+            if (v.url) {
+              resourcesToInsert.push({
+                topic_id: dbTopic.id,
+                type: "video",
+                title: v.title || `فيديو ${vIdx + 1}`,
+                url: v.url,
+                source_name: v.source || "YouTube",
+                position: vIdx + 1,
+              })
+            }
+          })
+
+          // 2. ALL PDFs attached to lecture
+          const pdfs =
+            Array.isArray(lec.pdfs) && lec.pdfs.length > 0
+              ? lec.pdfs
+              : lec.pdfUrl
+              ? [{ id: `p1`, title: lec.pdfName || "سلايدات المحاضرة", url: lec.pdfUrl }]
+              : []
+
+          pdfs.forEach((p, pIdx) => {
+            if (p.url) {
+              resourcesToInsert.push({
+                topic_id: dbTopic.id,
+                type: "slide",
+                title: p.title || `ملف المحاضرة ${pIdx + 1}`,
+                url: p.url,
+                position: 10 + pIdx,
+              })
+            }
+          })
+
+          // 3. ALL Roadmaps attached to lecture
+          if (Array.isArray(lec.roadmaps)) {
+            lec.roadmaps.forEach((m, mIdx) => {
+              if (m.imageUrl) {
+                resourcesToInsert.push({
+                  topic_id: dbTopic.id,
+                  type: "roadmap",
+                  title: m.title || `خريطة المفاهيم ${mIdx + 1}`,
+                  url: m.imageUrl,
+                  position: 20 + mIdx,
+                })
+              }
             })
           }
-          // Upsert PDF resource if exists
-          if (lec.pdfUrl) {
+
+          if (resourcesToInsert.length > 0) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await (client.from("resources") as any).insert({
-              topic_id: dbTopic.id,
-              type: "slide",
-              title: lec.pdfName || "سلايدات المحاضرة",
-              url: lec.pdfUrl,
-              position: 2,
-            })
+            await (client.from("resources") as any).insert(resourcesToInsert)
           }
         }
       }
     }
 
     revalidatePath("/courses")
+    revalidatePath(`/courses/${course.slug}`)
+    revalidatePath("/")
+    revalidatePath("/admin")
     return { success: true }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "خطأ أثناء مزامنة المقرر"

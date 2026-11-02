@@ -76,7 +76,13 @@ export function CoursesExplorer({ userLevel = 1, initialCourses }: CoursesExplor
             const valid = parsed.filter(
               (c: Course) =>
                 c.id.startsWith("admin-") ||
-                COURSES_DATA.some((official) => official.id === c.id)
+                c.id.startsWith("custom-") ||
+                COURSES_DATA.some(
+                  (official) =>
+                    official.id === c.id ||
+                    official.slug === c.slug ||
+                    official.code === c.code
+                )
             )
             setAllCourses(valid)
           }
@@ -131,6 +137,7 @@ export function CoursesExplorer({ userLevel = 1, initialCourses }: CoursesExplor
     const parsed = parseCourseTitle(course.title)
     const coverImg =
       course.imageUrl ||
+      COURSES_DATA.find((o) => o.id === course.id || o.slug === course.slug || o.code === course.code)?.imageUrl ||
       "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80"
 
     const levelText =

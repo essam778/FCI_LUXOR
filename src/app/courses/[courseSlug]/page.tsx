@@ -10,6 +10,8 @@ interface CoursePageProps {
   }>
 }
 
+export const revalidate = 60
+
 export async function generateMetadata({ params }: CoursePageProps): Promise<Metadata> {
   const { courseSlug } = await params
   const course = await getCourseBySlug(courseSlug)
