@@ -1,92 +1,99 @@
-@import url('https://fonts.googleapis.com/css2?family=Alexandria:wght@300;400;500;600;700;800;900&family=Cairo:wght@400;600;700;800;900&display=swap');
 @import "tailwindcss";
 
 @layer base {
   :root {
-    --background: 160 12% 98%;
-    --foreground: 160 20% 10%;
-    --card: 0 0% 100%;
-    --card-foreground: 160 20% 10%;
+    --background: 210 24% 98%;          /* Ultra-clean crisp slate white */
+    --foreground: 222 47% 11%;          /* Deep obsidian text */
+    --card: 0 0% 100%;                  /* Pure elevated card white */
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 160 20% 10%;
-    --primary: 84 82% 40%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 238 82% 59%;             /* Royal Indigo #4f46e5 */
     --primary-foreground: 0 0% 100%;
-    --secondary: 160 12% 93%;
-    --secondary-foreground: 160 20% 10%;
-    --muted: 160 10% 94%;
-    --muted-foreground: 160 8% 40%;
-    --accent: 160 12% 93%;
-    --accent-foreground: 160 20% 10%;
+    --secondary: 210 20% 95%;           /* Soft slate secondary */
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 20% 95%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 238 82% 96%;              /* Light indigo tint */
+    --accent-foreground: 238 82% 45%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 20% 98%;
-    --success: 84 82% 40%;
+    --success: 152 76% 36%;             /* Refined academic emerald */
     --warning: 38 92% 50%;
     --danger: 350 89% 60%;
-    --border: 160 10% 88%;
-    --input: 160 10% 88%;
-    --ring: 84 82% 40%;
+    --border: 214 32% 91%;              /* Subtle hairline border */
+    --input: 214 32% 91%;
+    --ring: 238 82% 59%;
     --radius: 0.75rem;
   }
 
   .dark {
-    --background: 160 12% 11%;      /* charcoal with a subtle green cast */
-    --foreground: 150 12% 95%;      /* crisp warm white */
-    --card: 160 12% 15%;            /* elevated charcoal card */
-    --card-foreground: 150 12% 95%;
-    --popover: 160 12% 14%;
-    --popover-foreground: 150 12% 95%;
-    --primary: 84 82% 56%;          /* electric lime */
-    --primary-foreground: 160 20% 10%; /* charcoal text on lime */
-    --secondary: 160 12% 18%;
-    --secondary-foreground: 150 12% 95%;
-    --muted: 160 10% 18%;
-    --muted-foreground: 150 6% 62%;
-    --accent: 160 12% 20%;
-    --accent-foreground: 150 12% 95%;
+    --background: 224 71% 4%;           /* Deep obsidian night #090d16 */
+    --foreground: 210 20% 98%;          /* Warm crisp white */
+    --card: 224 55% 8%;                 /* Refined elevated card layer #0f1523 */
+    --card-foreground: 210 20% 98%;
+    --popover: 224 60% 7%;
+    --popover-foreground: 210 20% 98%;
+    --primary: 235 86% 65%;             /* Electric Indigo #6366f1 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 224 40% 14%;
+    --secondary-foreground: 210 20% 98%;
+    --muted: 224 40% 14%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 235 86% 20%;
+    --accent-foreground: 235 86% 75%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 20% 98%;
-    --success: 84 82% 56%;
+    --success: 152 76% 45%;
     --warning: 38 92% 50%;
     --danger: 350 89% 60%;
-    --border: 160 10% 20%;          /* crisp charcoal border */
-    --input: 160 10% 20%;
-    --ring: 84 82% 56%;             /* glowing lime ring */
+    --border: 224 40% 15%;              /* Precision dark border */
+    --input: 224 40% 15%;
+    --ring: 235 86% 65%;
   }
 }
 
-.lime-sweep {
-  position: relative;
-  display: inline-block;
-}
-.lime-sweep::after {
-  content: '';
-  position: absolute;
-  bottom: -4px;
-  right: 0;
-  width: 48px;
-  height: 4px;
-  background-color: hsl(var(--primary));
-  border-radius: 9999px;
-  transition: width 0.35s ease;
-}
-.lime-sweep:hover::after {
-  width: 100%;
+/* Glassmorphism & High-end Elevation */
+.glass-header {
+  background: hsla(var(--background) / 0.82);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
 }
 
-.btn-punchy {
-  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+.card-hover {
+  transition: border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.btn-punchy:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 24px -6px hsla(84, 82%, 56%, 0.35);
+.card-hover:hover {
+  border-color: hsla(var(--primary) / 0.5);
+  box-shadow: 0 12px 30px -10px hsla(var(--primary) / 0.15);
+}
+
+.btn-primary-glow {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.btn-primary-glow:hover {
+  box-shadow: 0 8px 24px -4px hsla(var(--primary) / 0.35);
   filter: brightness(1.05);
 }
-.btn-punchy:active {
-  transform: translateY(0);
+
+/* Subtle modern scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsla(var(--muted-foreground) / 0.25);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsla(var(--muted-foreground) / 0.45);
 }
 
 @theme {
-  --font-sans: var(--font-alexandria), 'Alexandria', var(--font-cairo), 'Cairo', system-ui, -apple-system, sans-serif;
+  --font-sans: var(--font-alexandria), 'Alexandria', system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-jetbrains), monospace;
 
   --color-background: hsl(var(--background));
@@ -123,7 +130,7 @@ button,
 input,
 select,
 textarea {
-  font-family: var(--font-alexandria), 'Alexandria', var(--font-cairo), 'Cairo', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-alexandria), 'Alexandria', system-ui, -apple-system, sans-serif;
 }
 
 html,
@@ -138,6 +145,7 @@ body {
   color: hsl(var(--foreground));
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  line-height: 1.7;
 }
 
 /* LTR forced utility for code, math and technical expressions */

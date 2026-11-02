@@ -21,7 +21,6 @@ import { ThemeToggle } from "@/components/layout/ThemeToggle"
 import { NavbarSearch } from "@/components/layout/NavbarSearch"
 import { NotificationBell } from "@/components/layout/NotificationBell"
 import { StudentAvatar } from "@/components/dashboard/StudentAvatar"
-import { AdminSecretModal } from "@/components/admin/AdminSecretModal"
 import { logout } from "@/lib/actions/auth"
 import { createClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
@@ -141,26 +140,30 @@ export function Navbar({ initialUser = null }: NavbarProps) {
   }, [pathname])
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b border-border/70 glass-header">
       <div className="w-full max-w-7xl mx-auto flex h-16 items-center justify-between px-3 sm:px-6">
         {/* Right (Start in RTL): Logo & Main Nav */}
         <div className="flex items-center gap-4 sm:gap-6 shrink-0">
           <Link
             href="/"
-            className="flex items-center gap-2 font-bold text-base sm:text-lg text-foreground hover:opacity-90 transition-opacity shrink-0"
+            className="flex items-center gap-2.5 font-bold text-foreground hover:opacity-90 transition-opacity shrink-0"
           >
-            <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-sm shadow-primary/20 ring-1 ring-primary/30 shrink-0">
-              <GraduationCap className="size-6 sm:size-6" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs ring-1 ring-primary/40 shrink-0">
+              <GraduationCap className="size-5" />
             </div>
             <span className="font-extrabold text-sm sm:text-lg tracking-tight text-foreground truncate">
-             FCI Luxor
+              FCI Luxor
             </span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-2">
+          <nav className="hidden md:flex items-center gap-1.5">
             <Link
               href="/courses"
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-muted-foreground transition-colors hover:text-foreground hover:bg-muted/50"
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                pathname.startsWith("/courses")
+                  ? "text-primary bg-primary/10 font-bold"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+              }`}
             >
               <BookOpen className="size-4" />
               <span>المقررات الدراسية</span>
@@ -168,8 +171,13 @@ export function Navbar({ initialUser = null }: NavbarProps) {
             {isAdmin && (
               <Link
                 href="/admin"
-                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-primary bg-primary/10 border border-primary/20 hover:bg-primary/20 transition-colors"
+                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                  pathname.startsWith("/admin")
+                    ? "text-primary bg-primary/15 border border-primary/30"
+                    : "text-primary bg-primary/10 border border-primary/20 hover:bg-primary/20"
+                }`}
               >
+                <ShieldCheck className="size-3.5" />
                 <span>لوحة الإدارة</span>
               </Link>
             )}
@@ -319,7 +327,7 @@ export function Navbar({ initialUser = null }: NavbarProps) {
                   <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground">
                     <GraduationCap className="size-4.5" />
                   </div>
-                  <span className="font-extrabold text-sm">منصة حاسبات</span>
+                  <span className="font-extrabold text-sm">FCI Luxor</span>
                 </Link>
                 <Button
                   variant="ghost"
@@ -414,10 +422,6 @@ export function Navbar({ initialUser = null }: NavbarProps) {
         </div>,
         document.body
       )}
-
-
-      {/* Secret Admin Passkey Gateway Modal (Ctrl + Shift + A) */}
-      <AdminSecretModal />
     </header>
   )
 }

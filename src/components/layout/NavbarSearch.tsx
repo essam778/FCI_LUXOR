@@ -94,7 +94,7 @@ export function NavbarSearch() {
   return (
     <div ref={searchRef} className="relative w-full">
       <form onSubmit={handleSubmit} className="relative w-full">
-        <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+        <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground/70 pointer-events-none" />
         <input
           id="navbar-search-input"
           type="text"
@@ -104,30 +104,36 @@ export function NavbarSearch() {
             setIsOpen(true)
           }}
           onFocus={() => setIsOpen(true)}
-          placeholder="ابحث عن مادة، محاضرة، أو سؤال... (Ctrl+K)"
-          className="w-full h-9 rounded-xl border border-input bg-card/60 ps-9 pe-8 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all"
+          placeholder="ابحث عن مادة، محاضرة، أو سؤال..."
+          className="w-full h-9 rounded-lg border border-border/80 bg-card/50 ps-9 pe-16 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/60 transition-all"
         />
-        {query && (
-          <button
-            type="button"
-            onClick={() => setQuery("")}
-            className="absolute end-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-          >
-            <X className="size-3.5" />
-          </button>
-        )}
+        <div className="absolute end-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+          {query ? (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              className="text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              <X className="size-3.5" />
+            </button>
+          ) : (
+            <kbd className="hidden sm:inline-flex h-5 items-center gap-0.5 rounded border border-border/80 bg-muted/50 px-1.5 font-mono text-[10px] font-medium text-muted-foreground select-none pointer-events-none">
+              ⌘K
+            </kbd>
+          )}
+        </div>
       </form>
 
       {/* Live Suggestions Dropdown */}
       {isOpen && results.length > 0 && (
-        <div className="absolute top-full mt-2 w-full min-w-[320px] rounded-xl border border-border bg-card p-2 shadow-2xl z-50 space-y-1 animate-in fade-in-50 zoom-in-95 duration-150">
+        <div className="absolute top-full mt-2 w-full min-w-[340px] rounded-xl border border-border/80 bg-card/95 backdrop-blur-md p-2 shadow-xl z-50 space-y-1 animate-in fade-in-50 zoom-in-95 duration-150">
           <div className="px-2.5 py-1 text-[11px] font-bold text-muted-foreground">نتائج البحث الفورية:</div>
           {results.map((res, i) => (
             <button
               key={i}
               type="button"
               onClick={() => handleSelect(res.slug)}
-              className="w-full flex items-start gap-2.5 p-2 rounded-lg text-start hover:bg-muted/50 transition-colors cursor-pointer group"
+              className="w-full flex items-start gap-2.5 p-2 rounded-lg text-start hover:bg-muted/60 transition-colors cursor-pointer group"
             >
               <div className="size-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                 {res.type === "course" ? <BookOpen className="size-3.5" /> : <Layers className="size-3.5" />}
@@ -141,7 +147,7 @@ export function NavbarSearch() {
           <button
             type="button"
             onClick={handleSubmit}
-            className="w-full pt-1.5 pb-1 text-center text-xs font-bold text-primary hover:underline"
+            className="w-full pt-2 pb-1 text-center text-xs font-bold text-primary hover:underline border-t border-border/50 cursor-pointer"
           >
             عرض كافة النتائج في صفحة المقررات ←
           </button>

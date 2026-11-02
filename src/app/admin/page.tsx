@@ -1,12 +1,11 @@
-import { notFound } from "next/navigation"
-import { cookies } from "next/headers"
+import { redirect } from "next/navigation"
 import type { Metadata } from "next"
 import { createClient } from "@/lib/supabase/server"
 import { AdminDashboard } from "@/components/admin/AdminDashboard"
 
 export const metadata: Metadata = {
-  title: "لوحة الإدارة الأكاديمية | منصة حاسبات والمعلومات",
-  description: "لوحة التحكم وإدارة المحتوى الأكاديمي للمشرفين والمديرين.",
+  title: "Admin Control Center | FCI Luxor",
+  description: "Executive administrative portal and curriculum management system for FCI Luxor.",
 }
 
 export default async function AdminPage() {
@@ -15,9 +14,9 @@ export default async function AdminPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // If not logged in, pretend the page does not exist (404)
+  // If not logged in, redirect straight to login
   if (!user) {
-    notFound()
+    redirect("/login?next=/admin")
   }
 
   // Check role in profiles table
@@ -28,17 +27,15 @@ export default async function AdminPage() {
     .single()
 
   const profile = data as { role?: string } | null
-  const cookieStore = await cookies()
-  const hasAdminCookie = cookieStore.get("fci_admin_verified")?.value === "true"
   const isDatabaseAdmin = profile?.role === "admin"
 
-  // Only authorized administrators can access. Otherwise return 404 Not Found!
-  if (!isDatabaseAdmin && !hasAdminCookie) {
-    notFound()
+  // If not authorized as admin, redirect to student dashboard
+  if (!isDatabaseAdmin) {
+    redirect("/dashboard")
   }
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-3 sm:px-6 py-6 sm:py-10">
+    <div className="min-h-screen bg-background relative" dir="ltr">
       <AdminDashboard adminEmail={user.email || ""} />
     </div>
   )

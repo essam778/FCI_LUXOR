@@ -1,4 +1,5 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import type { Database } from '@/types/database'
 
@@ -28,3 +29,23 @@ export async function createClient() {
     },
   })
 }
+
+/**
+ * Service Role client for privileged backend-only tasks (e.g. promoting confirmed admin, internal sync).
+ * NEVER expose this or import in client components.
+ */
+export function createAdminClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const serviceRoleKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.NEXT_SUPABASE_SERVICE_ROLE_KEY
+
+  if (!serviceRoleKey) {
+    return null
+  }
+
+  return createSupabaseClient<Database>(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false },
+  })
+}
+

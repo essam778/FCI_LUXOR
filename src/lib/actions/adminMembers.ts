@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { sanitizeInput } from "@/lib/security"
 import type { UserRole } from "@/types/database"
 
@@ -24,22 +24,40 @@ export interface AdminMembersResult {
 }
 
 /**
+ * Helper to strictly verify the caller is an authenticated administrator.
+ */
+async function assertAdminCaller() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    throw new Error("غير مصرح: يجب تسجيل الدخول كمسؤول")
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single()
+
+  const role = (profile as { role?: string } | null)?.role
+  if (role !== "admin") {
+    throw new Error("غير مصرح: هذا الإجراء مخصص لمدير المنصة فقط")
+  }
+
+  return { supabase, user }
+}
+
+/**
  * Fetch all platform members for the admin management panel.
  */
 export async function getAdminMembers(): Promise<AdminMembersResult> {
   try {
-    const supabase = await createClient()
+    const { supabase } = await assertAdminCaller()
 
-    // 1. Verify caller has admin session/role
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return { success: false, error: "غير مصرح: يجب تسجيل الدخول كمسؤول" }
-    }
-
-    // 2. Fetch all profiles
+    // Fetch all profiles
     const { data, error } = await supabase
       .from("profiles")
       .select("id, display_name, email, university, level, role, status, avatar_url, created_at")
@@ -72,14 +90,18 @@ export async function updateAdminMember(params: {
   status?: string
 }): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = await createClient()
+    const { supabase } = await assertAdminCaller()
 
     const cleanName = sanitizeInput(params.display_name)
     const cleanUniversity = params.university ? sanitizeInput(params.university) : ""
     const cleanStatus = params.status ? sanitizeInput(params.status) : "active"
 
+    // Use admin client if available to ensure permission, or standard client
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase.from("profiles") as any)
+    const client: any = createAdminClient() || supabase
+
+    const { error } = await client
+      .from("profiles")
       .update({
         display_name: cleanName,
         role: params.role,
@@ -109,10 +131,13 @@ export async function quickChangeMemberRole(
   newRole: UserRole
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = await createClient()
+    const { supabase } = await assertAdminCaller()
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase.from("profiles") as any)
+    const client: any = createAdminClient() || supabase
+
+    const { error } = await client
+      .from("profiles")
       .update({ role: newRole })
       .eq("id", memberId)
 
@@ -135,10 +160,13 @@ export async function deleteAdminMember(
   memberId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = await createClient()
+    const { supabase } = await assertAdminCaller()
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase.from("profiles") as any)
+    const client: any = createAdminClient() || supabase
+
+    const { error } = await client
+      .from("profiles")
       .delete()
       .eq("id", memberId)
 
@@ -153,3 +181,4 @@ export async function deleteAdminMember(
     return { success: false, error: msg }
   }
 }
+

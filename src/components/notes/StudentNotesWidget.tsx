@@ -347,7 +347,7 @@ export function StudentNotesWidget({ initialUser = null }: StudentNotesWidgetPro
           {/* Top Header */}
           <div className="p-4 bg-muted/40 border-b border-border flex items-center justify-between gap-3 shrink-0">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="size-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-sky-500 text-white flex items-center justify-center shrink-0 shadow-sm">
+              <div className="size-9 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0 shadow-xs">
                 <StickyNote className="size-5" />
               </div>
               <div className="min-w-0">
@@ -733,7 +733,7 @@ export function StudentNotesWidget({ initialUser = null }: StudentNotesWidgetPro
         <button
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
-          className="relative size-14 rounded-2xl bg-gradient-to-tr from-emerald-600 to-sky-600 text-white shadow-xl shadow-emerald-600/30 hover:shadow-2xl hover:shadow-emerald-600/50 hover:scale-105 active:scale-95 transition-all duration-300 flex items-center justify-center border-2 border-white/20 backdrop-blur-md cursor-pointer"
+          className="relative size-13 rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/35 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center border border-white/20 cursor-pointer"
           title="دفتر الملاحظات السحابي"
           aria-label="افتح دفتر الملاحظات السحابي"
         >

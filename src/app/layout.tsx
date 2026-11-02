@@ -1,22 +1,15 @@
 import type { Metadata } from "next"
-import { Alexandria, Cairo, JetBrains_Mono } from "next/font/google"
+import { Alexandria, JetBrains_Mono } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Navbar } from "@/components/layout/Navbar"
 import { StudentNotesWidget } from "@/components/notes/StudentNotesWidget"
 import { Footer } from "@/components/layout/Footer"
+import { KineticGrid } from "@/components/ui/kinetic-grid"
 
 const alexandria = Alexandria({
   subsets: ["arabic", "latin"],
   variable: "--font-alexandria",
-  weight: ["300", "400", "500", "600", "700", "800", "900"],
-  display: "swap",
-})
-
-const cairo = Cairo({
-  subsets: ["arabic", "latin"],
-  variable: "--font-cairo",
-  weight: ["400", "500", "600", "700", "800", "900"],
   display: "swap",
 })
 
@@ -53,14 +46,16 @@ export default async function RootLayout({
       lang="ar"
       dir="rtl"
       suppressHydrationWarning
-      className={`${alexandria.variable} ${cairo.variable} ${jetbrainsMono.variable}`}
+      className={`${alexandria.variable} ${jetbrainsMono.variable}`}
     >
       <body className="min-h-screen flex flex-col font-sans bg-background text-foreground antialiased overflow-x-hidden w-full max-w-full">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <Navbar initialUser={user} />
-          <main className="flex-1 w-full max-w-full overflow-x-hidden">{children}</main>
-          <Footer user={user} />
-          <StudentNotesWidget initialUser={user} />
+          <KineticGrid className="min-h-screen flex flex-col w-full">
+            <Navbar initialUser={user} />
+            <main className="flex-1 w-full max-w-full overflow-x-hidden">{children}</main>
+            <Footer user={user} />
+            <StudentNotesWidget initialUser={user} />
+          </KineticGrid>
         </ThemeProvider>
       </body>
     </html>

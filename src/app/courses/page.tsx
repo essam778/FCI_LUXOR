@@ -1,6 +1,7 @@
 import * as React from "react"
 import type { Metadata } from "next"
 import { createClient } from "@/lib/supabase/server"
+import { getCoursesList } from "@/lib/queries/courses"
 import { CoursesExplorer } from "@/components/course/CoursesExplorer"
 
 export const metadata: Metadata = {
@@ -36,6 +37,8 @@ export default async function CoursesPage() {
     // If not authenticated, default to level 1
   }
 
+  const initialCourses = await getCoursesList()
+
   return (
     <div className="w-full max-w-6xl mx-auto px-3 sm:px-6 py-6 sm:py-12">
       <React.Suspense
@@ -46,7 +49,11 @@ export default async function CoursesPage() {
           </div>
         }
       >
-        <CoursesExplorer userLevel={userLevel} userDisplayName={displayName} />
+        <CoursesExplorer
+          userLevel={userLevel}
+          userDisplayName={displayName}
+          initialCourses={initialCourses}
+        />
       </React.Suspense>
     </div>
   )

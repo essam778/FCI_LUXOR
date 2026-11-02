@@ -1,8 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { cookies } from "next/headers"
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 
 const MASTER_ADMIN_SECRET = process.env.ADMIN_MASTER_SECRET || "fci-admin-secure-2025"
 
@@ -22,7 +21,8 @@ export async function verifyAdminPasskey(
       return { error: "يرجى إدخال رمز الأمان الإداري" }
     }
 
-    if (passkey !== MASTER_ADMIN_SECRET && passkey !== "admin12345" && passkey !== "fci2025") {
+    // Strict validation against configured ADMIN_MASTER_SECRET only. Backdoor passkeys removed.
+    if (passkey !== MASTER_ADMIN_SECRET) {
       return { error: "رمز الأمان الإداري غير صحيح. تم تسجيل محاولة الدخول غير المصرح بها." }
     }
 
@@ -35,36 +35,39 @@ export async function verifyAdminPasskey(
       return { error: "يجب تسجيل الدخول بحسابك أولاً قبل تفعيل صلاحيات الإدارة" }
     }
 
-    // Elevate role in database to 'admin'
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase.from("profiles") as any)
-      .update({ role: "admin" })
-      .eq("id", user.id)
+    // Elevate role in database to 'admin' using Admin Client (bypassing student self-promotion RLS block safely)
+    const adminClient = createAdminClient()
+    if (adminClient) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: adminErr } = await (adminClient.from("profiles") as any)
+        .update({ role: "admin" })
+        .eq("id", user.id)
 
-    if (error) {
-      // If RLS prevents student from self-promoting directly without service key,
-      // we still set a secure httpOnly cookie for the session
-      console.warn("Could not elevate profile in db directly:", error.message)
+      if (adminErr) {
+        console.error("Failed to promote user to admin:", adminErr.message)
+        return { error: `فشل ترقية الحساب: ${adminErr.message}` }
+      }
+    } else {
+      // Fallback to standard client
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase.from("profiles") as any)
+        .update({ role: "admin" })
+        .eq("id", user.id)
+
+      if (error) {
+        return { error: `فشل ترقية الحساب: ${error.message}` }
+      }
     }
-
-    // Set secure admin session cookie
-    const cookieStore = await cookies()
-    cookieStore.set("fci_admin_verified", "true", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 60 * 60 * 8, // 8 hours
-      path: "/",
-      sameSite: "lax",
-    })
 
     revalidatePath("/admin")
     revalidatePath("/dashboard")
     return {
       success: true,
-      message: "تم التحقق من الصلاحيات الإدارية بنجاح! جاري توجيهك...",
+      message: "تم التحقق من الصلاحيات الإدارية وتفعيل حساب المدير بنجاح! جاري توجيهك...",
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "فشل التحقق من صلاحية الإدارة"
     return { error: msg }
   }
 }
+

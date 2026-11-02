@@ -64,6 +64,7 @@ export interface Course {
   semester: number // 1, 2
   status: 'published' | 'reviewed' | 'draft'
   studyPlanDays?: number
+  imageUrl?: string
   lectures: LectureChapter[]
 }
 
@@ -86,6 +87,7 @@ export const COURSES_DATA: Course[] = [
     semester: 1,
     status: "published",
     studyPlanDays: 10,
+    imageUrl: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80",
     lectures: [
       {
         id: "l1-s1-it-lec1",
@@ -188,6 +190,7 @@ export const COURSES_DATA: Course[] = [
     semester: 1,
     status: "published",
     studyPlanDays: 14,
+    imageUrl: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&auto=format&fit=crop&q=80",
     lectures: [
       {
         id: "l1-s1-cs101-lec1",
@@ -279,6 +282,7 @@ export const COURSES_DATA: Course[] = [
     semester: 1,
     status: "published",
     studyPlanDays: 10,
+    imageUrl: "https://images.unsplash.com/photo-1517077304055-6e89abbf09b0?w=800&auto=format&fit=crop&q=80",
     lectures: [
       {
         id: "l1-s1-elec-lec1",
@@ -318,6 +322,7 @@ export const COURSES_DATA: Course[] = [
     semester: 1,
     status: "published",
     studyPlanDays: 10,
+    imageUrl: "https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=800&auto=format&fit=crop&q=80",
     lectures: [
       {
         id: "l1-s1-phys-lec1",
@@ -356,6 +361,7 @@ export const COURSES_DATA: Course[] = [
     semester: 1,
     status: "published",
     studyPlanDays: 12,
+    imageUrl: "https://images.unsplash.com/photo-1509228468518-180dd4864904?w=800&auto=format&fit=crop&q=80",
     lectures: [
       {
         id: "l1-s1-math-lec1",
@@ -395,6 +401,7 @@ export const COURSES_DATA: Course[] = [
     semester: 1,
     status: "published",
     studyPlanDays: 7,
+    imageUrl: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&auto=format&fit=crop&q=80",
     lectures: [
       {
         id: "l1-s1-comm-lec1",
@@ -434,6 +441,7 @@ export const COURSES_DATA: Course[] = [
     semester: 1,
     status: "published",
     studyPlanDays: 7,
+    imageUrl: "https://images.unsplash.com/photo-1457369804613-52c61a468e7d?w=800&auto=format&fit=crop&q=80",
     lectures: [
       {
         id: "l1-s1-eng-lec1",

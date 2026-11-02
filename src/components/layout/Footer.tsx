@@ -27,10 +27,10 @@ export function Footer({ user }: FooterProps) {
               <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">
                 <GraduationCap className="size-4.5" />
               </div>
-              <span className="text-base font-black">منصة حاسبات والمعلومات</span>
+              <span className="text-base font-black">FCI Luxor</span>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              منصة دراسية تفاعلية مخصصة لطلاب كليات الحاسبات والذكاء الاصطناعي: شروحات مبسطة، خرائط ذهنية، بنك أسئلة محلولة، ومتابعة متقدمة للمقررات.
+              منصة دراسية تفاعلية مخصصة لطلاب كلية الحاسبات والمعلومات والذكاء الاصطناعي بالأقصر (FCI Luxor).
             </p>
           </div>
 

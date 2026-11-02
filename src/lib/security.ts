@@ -5,7 +5,8 @@
  */
 
 /**
- * Sanitize text inputs by escaping HTML entities and stripping dangerous script tags and null bytes.
+ * Sanitize text inputs by stripping dangerous null bytes and non-printable control characters,
+ * while preserving valid code syntax, semicolons, quotes, and mathematical operators.
  */
 export function sanitizeInput(input: unknown): string {
   if (typeof input !== "string") {
@@ -14,16 +15,10 @@ export function sanitizeInput(input: unknown): string {
   }
 
   return input
-    // Remove null bytes
+    // Strip null bytes
     .replace(/\0/g, "")
-    // Escape HTML special characters to prevent XSS
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;")
-    // Remove potential SQL injection patterns if used in raw query contexts
-    .replace(/(--|\/\*|\*\/|;)/g, "")
+    // Strip invisible/dangerous control characters (preserving tabs, newlines \n, \r)
+    .replace(/[\x01-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
     .trim()
 }
 
