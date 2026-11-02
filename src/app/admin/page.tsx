@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import type { Metadata } from "next"
 import { createClient } from "@/lib/supabase/server"
+import { getCoursesList } from "@/lib/queries/courses"
 import { AdminDashboard } from "@/components/admin/AdminDashboard"
 
 export const metadata: Metadata = {
@@ -34,9 +35,12 @@ export default async function AdminPage() {
     redirect("/dashboard")
   }
 
+  // Fetch true live courses from Supabase (Source of Truth)
+  const initialCourses = await getCoursesList()
+
   return (
     <div className="min-h-screen bg-background relative" dir="ltr">
-      <AdminDashboard adminEmail={user.email || ""} />
+      <AdminDashboard adminEmail={user.email || ""} initialCourses={initialCourses} />
     </div>
   )
 }

@@ -28,6 +28,8 @@ import {
   TrendingUp,
   LayoutDashboard,
   Database,
+  UploadCloud,
+  RefreshCw,
 } from "lucide-react"
 
 import { AdminMembersTab } from "./AdminMembersTab"
@@ -76,7 +78,13 @@ interface AttachedResource {
   date: string
 }
 
-export function AdminDashboard({ adminEmail }: { adminEmail: string }) {
+export function AdminDashboard({
+  adminEmail,
+  initialCourses,
+}: {
+  adminEmail: string
+  initialCourses?: Course[]
+}) {
   // Navigation sidebar view
   const [currentView, setCurrentView] = React.useState<
     "overview" | "courses" | "resources" | "members" | "announcements" | "system"
@@ -84,31 +92,89 @@ export function AdminDashboard({ adminEmail }: { adminEmail: string }) {
 
   const [preselectedNotifyMember, setPreselectedNotifyMember] = React.useState<AdminMember | null>(null)
 
-  // Courses state
+  // Courses state: Uses live Supabase data as single source of truth, gracefully merged with local changes
   const [coursesList, setCoursesList] = React.useState<Course[]>(() => {
+    const baseCourses = initialCourses && initialCourses.length > 0 ? initialCourses : COURSES_DATA
     if (typeof window !== "undefined") {
       try {
         localStorage.removeItem("fci_admin_courses")
         localStorage.removeItem("fci_admin_courses_v2")
         const stored = localStorage.getItem("fci_admin_courses_v3")
         if (stored) {
-          const parsed = JSON.parse(stored)
+          const parsed = JSON.parse(stored) as Course[]
           if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed.map((c: Course) => ({
-              ...c,
-              imageUrl:
-                c.imageUrl ||
-                COURSES_DATA.find((official) => official.id === c.id)?.imageUrl ||
-                "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80",
-            }))
+            return baseCourses.map((bc) => {
+              const localMatch = parsed.find(
+                (lc) => lc.id === bc.id || lc.code === bc.code || lc.slug === bc.slug
+              )
+              if (localMatch && (localMatch.lectures?.length || 0) >= (bc.lectures?.length || 0)) {
+                return {
+                  ...bc,
+                  ...localMatch,
+                  imageUrl: localMatch.imageUrl || bc.imageUrl,
+                }
+              }
+              return bc
+            })
           }
         }
       } catch {
         // ignore
       }
     }
-    return COURSES_DATA
+    return baseCourses
   })
+
+  // Auto-sync any local courses that have more lectures than cloud database
+  React.useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const stored = localStorage.getItem("fci_admin_courses_v3")
+      if (!stored) return
+      const parsed = JSON.parse(stored) as Course[]
+      if (!Array.isArray(parsed)) return
+
+      const needSync = parsed.filter((localC) => {
+        const dbC = initialCourses?.find(
+          (c) => c.id === localC.id || c.code === localC.code || c.slug === localC.slug
+        )
+        return !dbC || (localC.lectures?.length || 0) > (dbC.lectures?.length || 0)
+      })
+
+      if (needSync.length > 0) {
+        Promise.all(needSync.map((c) => syncFullCourseToDatabase(c)))
+          .then((results) => {
+            const successCount = results.filter((r) => r.success).length
+            if (successCount > 0) {
+              setSavedStatus(`تمت مزامنة ${successCount} مقرر ومحاضرات محلية تلقائياً مع السحابة (Supabase) ✓`)
+              setTimeout(() => setSavedStatus(null), 4000)
+            }
+          })
+          .catch((e) => console.warn("[Auto-Sync error]", e))
+      }
+    } catch {
+      // ignore
+    }
+  }, [initialCourses])
+
+  const [isSyncingAll, setIsSyncingAll] = React.useState(false)
+  const handleSyncAllToSupabase = async () => {
+    setIsSyncingAll(true)
+    setSavedStatus("جاري مزامنة كافة المقررات والمحاضرات مع قاعدة بيانات Supabase السحابية...")
+    try {
+      let successCount = 0
+      for (const course of coursesList) {
+        const res = await syncFullCourseToDatabase(course)
+        if (res.success) successCount++
+      }
+      setSavedStatus(`تمت مزامنة ${successCount} من أصل ${coursesList.length} مقرر دراسي مع Supabase بنجاح! ☁️✓`)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "فشلت المزامنة الشاملة")
+    } finally {
+      setIsSyncingAll(false)
+      setTimeout(() => setSavedStatus(null), 4500)
+    }
+  }
 
   // Attached resources list
   const [resourcesList, setResourcesList] = React.useState<AttachedResource[]>(() => {
@@ -244,21 +310,27 @@ export function AdminDashboard({ adminEmail }: { adminEmail: string }) {
   const [resTitle, setResTitle] = React.useState("")
   const [resUrl, setResUrl] = React.useState("")
 
-  // Persist courses to localStorage and background sync with Supabase
+  // Persist courses to localStorage and sync with Supabase
   const persistCourses = (updated: Course[], courseToSync?: Course) => {
     setCoursesList(updated)
     if (typeof window !== "undefined") {
       localStorage.setItem("fci_admin_courses_v3", JSON.stringify(updated))
     }
     if (courseToSync) {
+      setSavedStatus(`جاري حفظ ومزامنة مادة "${courseToSync.title}" مع السحابة (Supabase)...`)
       syncFullCourseToDatabase(courseToSync)
         .then((res) => {
           if (res.success) {
-            console.log(`[Supabase] Synced course ${courseToSync.code} successfully.`)
+            setSavedStatus(`تم الحفظ والمزامنة السحابية لمادة "${courseToSync.code}" بنجاح في Supabase ✓`)
+          } else {
+            setSavedStatus(`تنبيه: تم الحفظ محلياً لكن تعذرت المزامنة مع Supabase: ${res.error}`)
           }
         })
         .catch((err) => {
-          console.warn("[Supabase Sync Notice]", err)
+          setSavedStatus(`خطأ في مزامنة السحابة: ${err instanceof Error ? err.message : "خطأ غير متوقع"}`)
+        })
+        .finally(() => {
+          setTimeout(() => setSavedStatus(null), 4000)
         })
     }
   }
@@ -1011,6 +1083,18 @@ export function AdminDashboard({ adminEmail }: { adminEmail: string }) {
                 className="ps-8 h-9 text-xs bg-muted/30 border-border/60 rounded-xl"
               />
             </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isSyncingAll}
+              onClick={handleSyncAllToSupabase}
+              className="font-bold text-xs gap-1.5 h-9 rounded-xl border-sky-500/40 text-sky-400 hover:bg-sky-500/10 cursor-pointer"
+              title="مزامنة جميع المواد والمحاضرات مع قاعدة بيانات Supabase السحابية"
+            >
+              <UploadCloud className={`size-4 ${isSyncingAll ? "animate-bounce text-sky-400" : ""}`} />
+              <span>{isSyncingAll ? "جاري المزامنة..." : "مزامنة السحابة (Supabase)"}</span>
+            </Button>
 
             <Button
               size="sm"
