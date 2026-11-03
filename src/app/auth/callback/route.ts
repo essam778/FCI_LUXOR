@@ -17,6 +17,30 @@ export async function GET(request: Request) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
+      // Ensure profile exists for OAuth user
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        const displayName =
+          user.user_metadata?.full_name ||
+          user.user_metadata?.name ||
+          user.user_metadata?.display_name ||
+          user.email?.split("@")[0] ||
+          "طالب"
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase.from("profiles") as any).upsert(
+          {
+            id: user.id,
+            email: user.email,
+            display_name: displayName,
+            role: "student",
+            subscription_status: "unpaid",
+          },
+          { onConflict: "id", ignoreDuplicates: true }
+        )
+      }
       return NextResponse.redirect(`${origin}${next}`)
     }
   }
