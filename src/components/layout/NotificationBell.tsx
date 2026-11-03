@@ -221,7 +221,7 @@ export function NotificationBell() {
       </button>
 
       {isOpen && (
-        <div className="absolute start-0 md:end-0 md:start-auto top-full mt-2 w-80 sm:w-96 rounded-2xl border border-border/80 bg-card/95 backdrop-blur-xl p-3 shadow-2xl z-50 space-y-3 animate-in fade-in-50 zoom-in-95 duration-150">
+        <div className="fixed sm:absolute inset-x-3 sm:inset-x-auto end-2 sm:end-0 top-14 sm:top-full mt-1 sm:mt-2 w-auto sm:w-96 max-w-[calc(100vw-16px)] rounded-2xl border border-border/80 bg-card/95 backdrop-blur-xl p-3 shadow-2xl z-50 space-y-3 animate-in fade-in-50 zoom-in-95 duration-150">
           {/* Header */}
           <div className="flex items-center justify-between pb-2 border-b border-border/60 px-1">
             <div className="flex items-center gap-1.5 font-black text-xs sm:text-sm text-foreground">

@@ -159,20 +159,31 @@ export async function submitPaymentRequestAction(
       const ext = receiptFile.name.split(".").pop() || "jpg"
       const fileName = `receipt-${user.id}-${Date.now()}.${ext}`
 
-      const { data: uploadData, error: uploadErr } = await client.storage
-        .from("payment-receipts")
-        .upload(fileName, receiptFile, {
-          upsert: true,
-          contentType: receiptFile.type || "image/jpeg",
-        })
+      try {
+        const uploadPromise = client.storage
+          .from("payment-receipts")
+          .upload(fileName, receiptFile, {
+            upsert: true,
+            contentType: receiptFile.type || "image/jpeg",
+          })
 
-      if (!uploadErr && uploadData?.path) {
-        const {
-          data: { publicUrl },
-        } = client.storage.from("payment-receipts").getPublicUrl(uploadData.path)
-        screenshotUrl = publicUrl
-      } else {
-        console.warn("[submitPaymentRequest] Storage upload warning:", uploadErr?.message)
+        const timeoutPromise = new Promise<{ data: null; error: { message: string } }>((resolve) =>
+          setTimeout(() => resolve({ data: null, error: { message: "Upload timed out after 10s" } }), 10000)
+        )
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const raceResult: any = await Promise.race([uploadPromise, timeoutPromise])
+
+        if (!raceResult?.error && raceResult?.data?.path) {
+          const {
+            data: { publicUrl },
+          } = client.storage.from("payment-receipts").getPublicUrl(raceResult.data.path)
+          screenshotUrl = publicUrl
+        } else {
+          console.warn("[submitPaymentRequest] Storage upload warning:", raceResult?.error?.message)
+        }
+      } catch (uploadEx) {
+        console.warn("[submitPaymentRequest] Storage exception handled:", uploadEx)
       }
     }
 
@@ -468,6 +479,134 @@ export async function toggleUserSubscriptionAction(
     return { success: true }
   } catch (err) {
     const msg = err instanceof Error ? err.message : "فشل تعديل حالة الاشتراك"
+    return { success: false, error: msg }
+  }
+}
+
+/**
+ * Admin action: Manually activate any student by email or User UUID
+ */
+export async function manuallyActivateUserByEmailOrIdAction(
+  identifier: string
+): Promise<{
+  success: boolean
+  error?: string
+  user?: { id: string; display_name: string | null; email: string | null }
+}> {
+  try {
+    const { client } = await assertAdminCaller()
+    const cleanQuery = sanitizeInput(identifier.trim())
+
+    if (!cleanQuery) {
+      return { success: false, error: "Please enter a valid student email or User ID" }
+    }
+
+    // Try finding profile by exact ID if UUID format, or case-insensitive email
+    let targetProfile = null
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanQuery)
+
+    if (isUuid) {
+      const { data } = await client
+        .from("profiles")
+        .select("id, display_name, email")
+        .eq("id", cleanQuery)
+        .maybeSingle()
+      targetProfile = data
+    }
+
+    if (!targetProfile) {
+      const { data } = await client
+        .from("profiles")
+        .select("id, display_name, email")
+        .ilike("email", cleanQuery)
+        .maybeSingle()
+      targetProfile = data
+    }
+
+    // If still not found, try display_name partial search
+    if (!targetProfile) {
+      const { data } = await client
+        .from("profiles")
+        .select("id, display_name, email")
+        .ilike("display_name", cleanQuery)
+        .limit(1)
+      if (data && data.length > 0) {
+        targetProfile = data[0]
+      }
+    }
+
+    if (!targetProfile) {
+      return {
+        success: false,
+        error: `No user found matching "${cleanQuery}". Verify their email address.`,
+      }
+    }
+
+    // Activate subscription
+    const { error: updateErr } = await client
+      .from("profiles")
+      .update({
+        subscription_status: "active",
+      })
+      .eq("id", targetProfile.id)
+
+    if (updateErr) {
+      return { success: false, error: updateErr.message }
+    }
+
+    // Send notification
+    await dispatchRealNotification({
+      target_type: "user",
+      target_user_id: targetProfile.id,
+      title: "تم تفعيل اشتراكك يدوياً من الإدارة ⚡",
+      message: "أصبح بإمكانك الآن تصفح كافة المواد والمحاضرات في المنصة بالكامل.",
+      link: "/courses",
+      notification_type: "success",
+    })
+
+    revalidatePath("/courses")
+    revalidatePath("/admin")
+    revalidatePath("/dashboard")
+
+    return {
+      success: true,
+      user: {
+        id: targetProfile.id,
+        display_name: targetProfile.display_name,
+        email: targetProfile.email,
+      },
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Failed to activate user"
+    return { success: false, error: msg }
+  }
+}
+
+/**
+ * Admin action: Clear / purge all payment requests (e.g. For resetting testing data)
+ */
+export async function clearAllPaymentRequestsAction(): Promise<{
+  success: boolean
+  error?: string
+}> {
+  try {
+    const { client } = await assertAdminCaller()
+
+    // Delete all records in payment_requests
+    const { error } = await client
+      .from("payment_requests")
+      .delete()
+      .neq("id", "00000000-0000-0000-0000-000000000000")
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    revalidatePath("/admin")
+    return { success: true }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Failed to clear payment requests"
     return { success: false, error: msg }
   }
 }

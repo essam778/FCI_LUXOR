@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { Course } from "@/data/coursesData"
 import { submitPaymentRequestAction, type PaymentRequestItem } from "@/lib/actions/subscriptions"
+import { compressReceiptImage } from "@/lib/subscriptionUtils"
 
 interface CoursePaywallProps {
   course: Course
@@ -41,6 +42,7 @@ export function CoursePaywall({
 
   const [isCopied, setIsCopied] = React.useState(false)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const [isCompressing, setIsCompressing] = React.useState(false)
   const [statusMsg, setStatusMsg] = React.useState<{ text: string; type: "success" | "error" } | null>(null)
   const [hasPendingRequest, setHasPendingRequest] = React.useState(!!initialPendingRequest)
   const [pendingReqData, setPendingReqData] = React.useState<PaymentRequestItem | null>(initialPendingRequest || null)
@@ -55,12 +57,19 @@ export function CoursePaywall({
     }
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      setReceiptFile(file)
-      const previewUrl = URL.createObjectURL(file)
-      setFilePreview(previewUrl)
+      setFilePreview(URL.createObjectURL(file))
+      setIsCompressing(true)
+      try {
+        const compressed = await compressReceiptImage(file)
+        setReceiptFile(compressed)
+      } catch {
+        setReceiptFile(file)
+      } finally {
+        setIsCompressing(false)
+      }
     }
   }
 
@@ -461,10 +470,22 @@ export function CoursePaywall({
               {/* 4. Submit Button */}
               <Button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isCompressing}
                 className="w-full font-black text-xs sm:text-sm h-11 rounded-2xl shadow-md cursor-pointer"
               >
-                {isSubmitting ? "جاري إرسال طلب التفعيل..." : "إرسال طلب تفعيل الحساب (30 ج.م)"}
+                {isSubmitting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>جاري إرسال وتأكيد طلب التفعيل فوراً...</span>
+                  </span>
+                ) : isCompressing ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="size-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>جاري تحسين وضغط الصورة بسرعة...</span>
+                  </span>
+                ) : (
+                  "إرسال طلب تفعيل الحساب (30 ج.م)"
+                )}
               </Button>
 
               <p className="text-[11px] text-center text-muted-foreground">

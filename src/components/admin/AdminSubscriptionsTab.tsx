@@ -16,6 +16,10 @@ import {
   X,
   Phone,
   Hash,
+  UserCheck,
+  RotateCcw,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,6 +28,8 @@ import {
   getAdminPaymentRequestsAction,
   approvePaymentRequestAction,
   rejectPaymentRequestAction,
+  manuallyActivateUserByEmailOrIdAction,
+  clearAllPaymentRequestsAction,
   type PaymentRequestItem,
 } from "@/lib/actions/subscriptions"
 
@@ -31,10 +37,10 @@ interface AdminSubscriptionsTabProps {
   onStatusMessage: (msg: string) => void
 }
 
-function formatRequestDate(dateStr: string): string {
+function formatRequestDateEnglish(dateStr: string): string {
   try {
     const d = new Date(dateStr)
-    return d.toLocaleDateString("ar-EG", {
+    return d.toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -42,9 +48,11 @@ function formatRequestDate(dateStr: string): string {
       minute: "2-digit",
     })
   } catch {
-    return "مؤخراً"
+    return "Recently"
   }
 }
+
+const REVENUE_RESET_KEY = "fci_admin_revenue_reset_at"
 
 export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTabProps) {
   const [requests, setRequests] = React.useState<PaymentRequestItem[]>([])
@@ -60,7 +68,27 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
   const [rejectReason, setRejectReason] = React.useState("")
   const [isProcessing, setIsProcessing] = React.useState<string | null>(null)
 
+  // Manual Activation state
+  const [manualIdentifier, setManualIdentifier] = React.useState("")
+  const [isActivatingManual, setIsActivatingManual] = React.useState(false)
+
+  // Revenue Reset State
+  const [revenueResetTimestamp, setRevenueResetTimestamp] = React.useState<number | null>(null)
+
   const [copiedId, setCopiedId] = React.useState<string | null>(null)
+
+  // Load revenue reset preference
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem(REVENUE_RESET_KEY)
+      if (stored) {
+        const parsed = parseInt(stored, 10)
+        if (!isNaN(parsed)) {
+          setRevenueResetTimestamp(parsed)
+        }
+      }
+    }
+  }, [])
 
   const handleCopy = (text: string, id: string) => {
     if (navigator.clipboard) {
@@ -77,10 +105,10 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
       if (res.success && res.requests) {
         setRequests(res.requests)
       } else if (res.error) {
-        onStatusMessage(`تنبيه: ${res.error}`)
+        onStatusMessage(`Notice: ${res.error}`)
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "تعذر تحميل طلبات الاشتراك"
+      const msg = err instanceof Error ? err.message : "Failed to load payment requests"
       onStatusMessage(msg)
     } finally {
       setIsLoading(false)
@@ -91,8 +119,10 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
     loadRequests()
   }, [loadRequests])
 
+  // Approve payment
   const handleApprove = async (item: PaymentRequestItem) => {
-    if (!confirm(`هل أنت متأكد من تفعيل اشتراك الطالب "${item.user?.display_name || item.sender_phone}"؟`)) {
+    const studentName = item.user?.display_name || item.sender_phone
+    if (!confirm(`Are you sure you want to approve and activate the subscription for "${studentName}"?`)) {
       return
     }
 
@@ -103,17 +133,18 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
         setRequests((prev) =>
           prev.map((r) => (r.id === item.id ? { ...r, status: "approved" as const } : r))
         )
-        onStatusMessage(`✅ تم تفعيل حساب الطالب "${item.user?.display_name || item.sender_phone}" بنجاح!`)
+        onStatusMessage(`✅ Subscription successfully activated for "${studentName}"!`)
       } else {
-        alert(res.error || "فشل تفعيل الطلب")
+        alert(res.error || "Failed to approve payment request.")
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : "حدث خطأ غير متوقع")
+      alert(err instanceof Error ? err.message : "An unexpected error occurred.")
     } finally {
       setIsProcessing(null)
     }
   }
 
+  // Reject payment confirm
   const handleRejectConfirm = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!rejectingItem) return
@@ -133,16 +164,84 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
               : r
           )
         )
-        onStatusMessage(`تم رفض طلب التحويل وإرسال التنبيه للطالب.`)
+        onStatusMessage(`Payment request rejected and student notified.`)
         setRejectingItem(null)
         setRejectReason("")
       } else {
-        alert(res.error || "فشل رفض الطلب")
+        alert(res.error || "Failed to reject request.")
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : "حدث خطأ أثناء الرفض")
+      alert(err instanceof Error ? err.message : "Error rejecting payment request.")
     } finally {
       setIsProcessing(null)
+    }
+  }
+
+  // Manual Instant Activation
+  const handleManualActivate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!manualIdentifier.trim()) return
+
+    setIsActivatingManual(true)
+    try {
+      const res = await manuallyActivateUserByEmailOrIdAction(manualIdentifier)
+      if (res.success && res.user) {
+        const name = res.user.display_name || res.user.email || "Student"
+        onStatusMessage(`⚡ Account for "${name}" is now fully activated!`)
+        alert(`Success! Account "${name}" (${res.user.email}) has been activated with unlimited course access.`)
+        setManualIdentifier("")
+        loadRequests()
+      } else {
+        alert(res.error || "Could not find a student matching this Email or ID.")
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Manual activation error.")
+    } finally {
+      setIsActivatingManual(false)
+    }
+  }
+
+  // Revenue Reset
+  const handleResetRevenue = () => {
+    if (
+      confirm(
+        "Are you sure you want to zero out the platform revenue counter? This resets the revenue display to 0 EGP starting from right now. (All transaction records remain intact and safe in your database)."
+      )
+    ) {
+      const now = Date.now()
+      setRevenueResetTimestamp(now)
+      localStorage.setItem(REVENUE_RESET_KEY, String(now))
+      onStatusMessage("Revenue counter reset to 0 EGP.")
+    }
+  }
+
+  const handleRestoreRevenue = () => {
+    setRevenueResetTimestamp(null)
+    localStorage.removeItem(REVENUE_RESET_KEY)
+    onStatusMessage("Full revenue counter restored.")
+  }
+
+  // Clear all payment records
+  const handleClearAllRecords = async () => {
+    if (
+      confirm(
+        "DANGER: Are you sure you want to delete ALL payment requests from the database? This is only recommended for clearing test data."
+      )
+    ) {
+      setIsLoading(true)
+      try {
+        const res = await clearAllPaymentRequestsAction()
+        if (res.success) {
+          setRequests([])
+          onStatusMessage("All payment requests cleared.")
+        } else {
+          alert(res.error || "Failed to clear records.")
+        }
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Error clearing records.")
+      } finally {
+        setIsLoading(false)
+      }
     }
   }
 
@@ -167,38 +266,64 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
   const totalCount = requests.length
   const pendingCount = requests.filter((r) => r.status === "pending").length
   const approvedCount = requests.filter((r) => r.status === "approved").length
-  const totalRevenue = approvedCount * 30
+  const rejectedCount = requests.filter((r) => r.status === "rejected").length
+
+  // Calculate revenue (with reset filter if applied)
+  const approvedAfterReset = requests.filter((r) => {
+    if (r.status !== "approved") return false
+    if (!revenueResetTimestamp) return true
+    try {
+      const itemTime = new Date(r.created_at).getTime()
+      return itemTime > revenueResetTimestamp
+    } catch {
+      return true
+    }
+  })
+  const displayedRevenue = approvedAfterReset.length * 30
 
   return (
-    <div className="space-y-6 text-start" dir="rtl">
-      {/* 1. Header & Quick Metrics */}
+    <div className="space-y-6 text-start" dir="ltr">
+      {/* 1. Header & Quick Controls */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="space-y-1">
           <h2 className="text-lg sm:text-xl font-black text-foreground flex items-center gap-2">
             <CreditCard className="size-5 text-primary" />
-            <span>طلبات تفعيل الاشتراكات والمدفوعات</span>
+            <span>Subscriptions & Payment Gateway</span>
           </h2>
           <p className="text-xs text-muted-foreground">
-            راجع إيصالات فودافون كاش وانستا باي المرفوعة وفعّل حسابات الطلاب بضغطة زر.
+            Review Vodafone Cash and InstaPay transfer receipts, verify payments, and manage platform revenue.
           </p>
         </div>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={loadRequests}
-          disabled={isLoading}
-          className="text-xs font-bold gap-1.5 h-9 rounded-xl cursor-pointer self-end sm:self-auto"
-        >
-          <RefreshCw className={`size-3.5 ${isLoading ? "animate-spin" : ""}`} />
-          <span>تحديث الطلبات</span>
-        </Button>
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadRequests}
+            disabled={isLoading}
+            className="text-xs font-bold gap-1.5 h-9 rounded-xl cursor-pointer"
+          >
+            <RefreshCw className={`size-3.5 ${isLoading ? "animate-spin" : ""}`} />
+            <span>Refresh</span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleClearAllRecords}
+            className="text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 h-9 rounded-xl cursor-pointer"
+            title="Purge all test payment records"
+          >
+            <Trash2 className="size-3.5" />
+            <span className="hidden sm:inline">Purge Data</span>
+          </Button>
+        </div>
       </div>
 
-      {/* Metrics Row */}
+      {/* 2. Metrics Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="p-4 rounded-2xl border border-border bg-card space-y-1 shadow-xs">
-          <span className="text-xs text-muted-foreground font-bold">بانتظار المراجعة</span>
+          <span className="text-xs text-muted-foreground font-bold">Pending Review</span>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-amber-500">{pendingCount}</span>
             <Clock className="size-4 text-amber-500" />
@@ -206,23 +331,53 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
         </div>
 
         <div className="p-4 rounded-2xl border border-border bg-card space-y-1 shadow-xs">
-          <span className="text-xs text-muted-foreground font-bold">الاشتراكات المفعلة</span>
+          <span className="text-xs text-muted-foreground font-bold">Active Subscriptions</span>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-emerald-500">{approvedCount}</span>
             <CheckCircle2 className="size-4 text-emerald-500" />
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl border border-border bg-card space-y-1 shadow-xs">
-          <span className="text-xs text-muted-foreground font-bold">إجمالي الإيرادات المحققة</span>
-          <div className="flex items-baseline justify-between">
-            <span className="text-2xl font-black text-primary">{totalRevenue} ج.م</span>
+        {/* Revenue Card with Zero/Reset Option */}
+        <div className="p-4 rounded-2xl border border-border bg-card space-y-2 shadow-xs relative group">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground font-bold">Platform Revenue</span>
             <Sparkles className="size-4 text-primary" />
           </div>
+
+          <div className="flex items-baseline justify-between">
+            <span className="text-2xl font-black text-primary">{displayedRevenue} EGP</span>
+            {revenueResetTimestamp ? (
+              <button
+                type="button"
+                onClick={handleRestoreRevenue}
+                className="text-[10px] text-muted-foreground hover:text-primary flex items-center gap-1 cursor-pointer"
+                title="Restore full revenue count"
+              >
+                <RotateCcw className="size-3" />
+                <span>Undo Reset</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleResetRevenue}
+                className="text-[10px] text-muted-foreground hover:text-rose-500 font-medium transition-colors cursor-pointer"
+                title="Zero revenue counter"
+              >
+                Reset to 0
+              </button>
+            )}
+          </div>
+
+          {revenueResetTimestamp && (
+            <p className="text-[10px] text-amber-500 font-medium">
+              Counter reset active (showing recent income only)
+            </p>
+          )}
         </div>
 
         <div className="p-4 rounded-2xl border border-border bg-card space-y-1 shadow-xs">
-          <span className="text-xs text-muted-foreground font-bold">إجمالي الطلبات المستلمة</span>
+          <span className="text-xs text-muted-foreground font-bold">Total Requests</span>
           <div className="flex items-baseline justify-between">
             <span className="text-2xl font-black text-foreground">{totalCount}</span>
             <CreditCard className="size-4 text-muted-foreground" />
@@ -230,22 +385,60 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
         </div>
       </div>
 
-      {/* 2. Search & Filter Bar */}
+      {/* 3. Manual Instant Student Activation Card */}
+      <div className="p-4 sm:p-5 rounded-2xl border border-primary/30 bg-primary/5 shadow-xs space-y-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <UserCheck className="size-4.5 text-primary" />
+            <h4 className="text-sm font-black text-foreground">
+              Instant Manual Student Activation
+            </h4>
+          </div>
+          <span className="text-[11px] text-muted-foreground">
+            Activate a student directly without waiting for a transaction receipt
+          </span>
+        </div>
+
+        <form onSubmit={handleManualActivate} className="flex flex-col sm:flex-row gap-2.5">
+          <Input
+            value={manualIdentifier}
+            onChange={(e) => setManualIdentifier(e.target.value)}
+            placeholder="Enter student Email address or User UUID..."
+            className="text-xs bg-card h-9 rounded-xl flex-1 font-mono"
+            required
+          />
+          <Button
+            type="submit"
+            size="sm"
+            disabled={isActivatingManual || !manualIdentifier.trim()}
+            className="text-xs font-bold h-9 px-4 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground gap-1.5 cursor-pointer shrink-0"
+          >
+            {isActivatingManual ? (
+              <RefreshCw className="size-3.5 animate-spin" />
+            ) : (
+              <CheckCircle2 className="size-3.5" />
+            )}
+            <span>Activate Account</span>
+          </Button>
+        </form>
+      </div>
+
+      {/* 4. Search & Filter Bar */}
       <div className="p-4 rounded-2xl border border-border bg-card/60 backdrop-blur-md flex flex-col md:flex-row items-center justify-between gap-3 shadow-xs">
         <div className="relative w-full md:w-80">
           <Search className="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="ابحث بالطالب، الهاتف، أو الرقم المرجعي..."
+            placeholder="Search student, phone, or reference ID..."
             className="ps-9 h-9 text-xs bg-muted/20 rounded-xl"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery("")}
-              className="absolute end-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
+              className="absolute end-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs cursor-pointer"
             >
-              مسح
+              Clear
             </button>
           )}
         </div>
@@ -260,7 +453,7 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
                 : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
             }`}
           >
-            قيد المراجعة ({pendingCount})
+            Pending ({pendingCount})
           </button>
 
           <button
@@ -272,7 +465,7 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
                 : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
             }`}
           >
-            المفعلة ({approvedCount})
+            Approved ({approvedCount})
           </button>
 
           <button
@@ -284,7 +477,7 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
                 : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
             }`}
           >
-            المرفوضة
+            Rejected ({rejectedCount})
           </button>
 
           <button
@@ -296,25 +489,25 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
                 : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
             }`}
           >
-            الكل ({totalCount})
+            All Requests ({totalCount})
           </button>
         </div>
       </div>
 
-      {/* 3. Requests List */}
+      {/* 5. Requests List */}
       {isLoading ? (
         <div className="py-20 text-center text-xs text-muted-foreground space-y-3">
           <div className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p>جاري فحص طلبات الدفع والتحويلات...</p>
+          <p>Scanning payment requests and receipts...</p>
         </div>
       ) : filteredRequests.length === 0 ? (
         <div className="py-16 text-center rounded-3xl border border-dashed border-border p-8 space-y-2">
           <CreditCard className="size-8 text-muted-foreground mx-auto stroke-[1.5]" />
-          <h4 className="text-sm font-bold text-foreground">لا توجد طلبات مطابقة</h4>
+          <h4 className="text-sm font-bold text-foreground">No matching requests found</h4>
           <p className="text-xs text-muted-foreground">
             {statusFilter === "pending"
-              ? "رائع! لا توجد طلبات تحويل جديدة قيد الانتظار حالياً."
-              : "لم نجد أي طلبات تطابق معايير البحث المحددة."}
+              ? "All clear! There are currently no pending payment requests."
+              : "No requests found matching your current filter criteria."}
           </p>
         </div>
       ) : (
@@ -346,33 +539,33 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
                   <div className="space-y-1.5 min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="text-sm font-bold text-foreground truncate">
-                        {item.user?.display_name || "طالب"}
+                        {item.user?.display_name || "Student"}
                       </h4>
                       {item.user?.level && (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-muted text-muted-foreground">
-                          الفرقة {item.user.level}
+                          Level {item.user.level}
                         </span>
                       )}
                       {item.payment_method === "vodafone_cash" ? (
                         <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-500 border border-rose-500/25">
-                          فودافون كاش
+                          Vodafone Cash
                         </span>
                       ) : (
                         <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-500 border border-violet-500/25">
-                          انستا باي InstaPay
+                          InstaPay
                         </span>
                       )}
                     </div>
 
                     <p className="text-xs text-muted-foreground font-mono truncate">
-                      {item.user?.email || "بدون بريد"} • {formatRequestDate(item.created_at)}
+                      {item.user?.email || "No email"} • {formatRequestDateEnglish(item.created_at)}
                     </p>
 
                     {/* Transfer Identifiers (Phone & Reference) */}
                     <div className="flex items-center gap-3 text-xs flex-wrap pt-1">
                       <div className="flex items-center gap-1.5 bg-muted/40 px-2.5 py-1 rounded-lg border border-border/80">
                         <Phone className="size-3 text-muted-foreground" />
-                        <span className="text-muted-foreground text-[11px]">رقم المحول:</span>
+                        <span className="text-muted-foreground text-[11px]">Sender:</span>
                         <strong className="font-mono text-foreground" dir="ltr">
                           {item.sender_phone}
                         </strong>
@@ -380,7 +573,7 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
                           type="button"
                           onClick={() => handleCopy(item.sender_phone, `phone-${item.id}`)}
                           className="text-muted-foreground hover:text-foreground ms-1 cursor-pointer"
-                          title="نسخ رقم الهاتف"
+                          title="Copy phone number"
                         >
                           {copiedId === `phone-${item.id}` ? (
                             <Check className="size-3 text-emerald-500" />
@@ -392,7 +585,7 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
 
                       <div className="flex items-center gap-1.5 bg-muted/40 px-2.5 py-1 rounded-lg border border-border/80">
                         <Hash className="size-3 text-muted-foreground" />
-                        <span className="text-muted-foreground text-[11px]">الرقم المرجعي:</span>
+                        <span className="text-muted-foreground text-[11px]">Ref No:</span>
                         <strong className="font-mono text-foreground" dir="ltr">
                           {item.reference_number}
                         </strong>
@@ -400,7 +593,7 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
                           type="button"
                           onClick={() => handleCopy(item.reference_number, `ref-${item.id}`)}
                           className="text-muted-foreground hover:text-foreground ms-1 cursor-pointer"
-                          title="نسخ الرقم المرجعي"
+                          title="Copy reference number"
                         >
                           {copiedId === `ref-${item.id}` ? (
                             <Check className="size-3 text-emerald-500" />
@@ -411,13 +604,14 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
                       </div>
 
                       <span className="font-black text-xs text-emerald-500">
-                        {item.amount || 30} ج.م
+                        {item.amount || 30} EGP
                       </span>
                     </div>
 
                     {item.admin_notes && (
-                      <p className="text-[11px] text-rose-500 pt-1">
-                        سبب الرفض السابق: {item.admin_notes}
+                      <p className="text-[11px] text-rose-500 pt-1 flex items-center gap-1">
+                        <AlertTriangle className="size-3 shrink-0" />
+                        <span>Rejection note: {item.admin_notes}</span>
                       </p>
                     )}
                   </div>
@@ -431,12 +625,12 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
                       type="button"
                       onClick={() => setPreviewScreenshot(item.screenshot_url || null)}
                       className="group relative size-12 rounded-xl overflow-hidden border border-border hover:border-primary shrink-0 transition-all cursor-pointer shadow-xs"
-                      title="عرض إيصال التحويل بالحجم الكامل"
+                      title="View full receipt screenshot"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={item.screenshot_url}
-                        alt="إيصال الدفع"
+                        alt="Payment Receipt"
                         className="object-cover w-full h-full group-hover:scale-110 transition-transform"
                       />
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white">
@@ -445,7 +639,7 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
                     </button>
                   ) : (
                     <span className="text-[10px] text-muted-foreground bg-muted/40 px-2 py-1 rounded-md">
-                      بدون صورة إيصال
+                      No Receipt Image
                     </span>
                   )}
 
@@ -456,10 +650,10 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
                         size="sm"
                         disabled={isProcessing === item.id}
                         onClick={() => handleApprove(item)}
-                        className="h-9 px-3 rounded-xl font-black text-xs bg-emerald-500 hover:bg-emerald-600 text-white gap-1 shadow-sm cursor-pointer"
+                        className="h-9 px-3.5 rounded-xl font-black text-xs bg-emerald-500 hover:bg-emerald-600 text-white gap-1 shadow-sm cursor-pointer"
                       >
                         <CheckCircle2 className="size-3.5" />
-                        <span>تفعيل الحساب</span>
+                        <span>Approve</span>
                       </Button>
 
                       <Button
@@ -470,18 +664,18 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
                         className="h-9 px-3 rounded-xl font-bold text-xs text-destructive hover:bg-destructive/10 border-destructive/30 gap-1 cursor-pointer"
                       >
                         <XCircle className="size-3.5" />
-                        <span>رفض</span>
+                        <span>Reject</span>
                       </Button>
                     </div>
                   ) : isApproved ? (
                     <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-500 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20">
                       <CheckCircle2 className="size-3.5" />
-                      <span>مفعل ومقبول</span>
+                      <span>Approved & Active</span>
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-500 bg-rose-500/10 px-3 py-1.5 rounded-xl border border-rose-500/20">
                       <XCircle className="size-3.5" />
-                      <span>مرفوض</span>
+                      <span>Rejected</span>
                     </span>
                   )}
                 </div>
@@ -498,11 +692,11 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-md animate-in fade-in-50">
           <div className="relative max-w-2xl w-full max-h-[90vh] bg-card rounded-3xl border border-border shadow-2xl p-4 flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <h4 className="text-sm font-black text-foreground">إيصال التحويل وسكرين شوت العملية</h4>
+              <h4 className="text-sm font-black text-foreground">Payment Receipt & Screenshot</h4>
               <button
                 type="button"
                 onClick={() => setPreviewScreenshot(null)}
-                className="text-muted-foreground hover:text-foreground p-1 rounded-lg"
+                className="text-muted-foreground hover:text-foreground p-1 rounded-lg cursor-pointer"
               >
                 <X className="size-5" />
               </button>
@@ -524,7 +718,7 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-xs text-primary font-bold hover:underline"
               >
-                <span>فتح في نافذة مستقلة</span>
+                <span>Open in new window</span>
                 <ExternalLink className="size-3.5" />
               </a>
             </div>
@@ -541,20 +735,20 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
             <div className="space-y-1 text-start">
               <h4 className="text-base font-black text-foreground flex items-center gap-2">
                 <XCircle className="size-5 text-destructive" />
-                <span>رفض طلب التحويل</span>
+                <span>Reject Payment Request</span>
               </h4>
               <p className="text-xs text-muted-foreground">
-                يرجى توضيح سبب الرفض ليظهر للطالب ويعيد المحاولة بالبيانات الصحيحة.
+                Please provide a reason so the student understands what went wrong and can retry with correct data.
               </p>
             </div>
 
             <form onSubmit={handleRejectConfirm} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-foreground">سبب الرفض:</label>
+                <label className="text-xs font-bold text-foreground">Rejection Reason:</label>
                 <Input
                   value={rejectReason}
                   onChange={(e) => setRejectReason(e.target.value)}
-                  placeholder="مثال: الرقم المرجعي غير مطابق، أو لم يصل التحويل بالمحفظة"
+                  placeholder="e.g. Reference number not found in wallet, or transfer amount does not match."
                   required
                   className="h-10 text-xs bg-muted/20 rounded-xl"
                 />
@@ -569,9 +763,9 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
                     setRejectingItem(null)
                     setRejectReason("")
                   }}
-                  className="text-xs h-9 rounded-xl"
+                  className="text-xs h-9 rounded-xl cursor-pointer"
                 >
-                  إلغاء
+                  Cancel
                 </Button>
 
                 <Button
@@ -579,9 +773,9 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
                   variant="destructive"
                   size="sm"
                   disabled={isProcessing === rejectingItem.id}
-                  className="text-xs font-bold h-9 rounded-xl"
+                  className="text-xs font-bold h-9 rounded-xl cursor-pointer"
                 >
-                  {isProcessing === rejectingItem.id ? "جاري الرفض..." : "تأكيد الرفض"}
+                  {isProcessing === rejectingItem.id ? "Rejecting..." : "Confirm Rejection"}
                 </Button>
               </div>
             </form>

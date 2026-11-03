@@ -291,8 +291,9 @@ export function Navbar({ initialUser = null }: NavbarProps) {
           )}
         </div>
 
-        {/* Mobile menu hamburger button */}
-        <div className="flex md:hidden items-center gap-2">
+        {/* Mobile menu controls: Notifications, Theme, & Hamburger */}
+        <div className="flex md:hidden items-center gap-1.5">
+          <NotificationBell />
           <ThemeToggle />
           <Button
             variant="ghost"

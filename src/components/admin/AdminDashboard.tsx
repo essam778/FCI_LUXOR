@@ -263,6 +263,11 @@ export function AdminDashboard({
   const [newSubMapUrl, setNewSubMapUrl] = React.useState("")
   const [newSubMapDesc, setNewSubMapDesc] = React.useState("")
 
+  // Editing individual media items inside Lecture Studio
+  const [editingVideoId, setEditingVideoId] = React.useState<string | null>(null)
+  const [editingPdfId, setEditingPdfId] = React.useState<string | null>(null)
+  const [editingRoadmapId, setEditingRoadmapId] = React.useState<string | null>(null)
+
   // Resource Upload Form State
   const [resCourseId, setResCourseId] = React.useState<string>(coursesList[0]?.id || "")
   const [resLectureId, setResLectureId] = React.useState<string>("")
@@ -615,7 +620,7 @@ export function AdminDashboard({
     setEditLectureRoadmaps(initialRoadmaps)
     setEditLectureQuiz(initialQuiz)
 
-    // Reset sub forms
+    // Reset sub forms & editing states
     setNewSubVideoTitle("")
     setNewSubVideoUrl("")
     setNewSubPdfTitle("")
@@ -623,6 +628,9 @@ export function AdminDashboard({
     setNewSubMapTitle("")
     setNewSubMapUrl("")
     setNewSubMapDesc("")
+    setEditingVideoId(null)
+    setEditingPdfId(null)
+    setEditingRoadmapId(null)
 
     // Reset quiz question editor
     setEditingQuizIndex(null)
@@ -635,62 +643,150 @@ export function AdminDashboard({
     setQuizFormExplanation("")
   }
 
-  // Video management inside lecture
+  // Video management inside lecture (Add + Edit)
+  const handleStartEditVideo = (v: VideoItem) => {
+    setEditingVideoId(v.id)
+    setNewSubVideoTitle(v.title)
+    setNewSubVideoUrl(v.url)
+  }
+
+  const handleCancelEditVideo = () => {
+    setEditingVideoId(null)
+    setNewSubVideoTitle("")
+    setNewSubVideoUrl("")
+  }
+
   const handleAddVideoToEdit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newSubVideoTitle || !newSubVideoUrl) return
-    const newV: VideoItem = {
-      id: `v-${Date.now()}`,
-      title: cleanText(newSubVideoTitle),
-      url: cleanText(newSubVideoUrl),
-      source: "YouTube",
-      duration: "Recorded Stream",
+    if (!newSubVideoTitle.trim() || !newSubVideoUrl.trim()) return
+
+    if (editingVideoId) {
+      setEditLectureVideos((prev) =>
+        prev.map((v) =>
+          v.id === editingVideoId
+            ? { ...v, title: cleanText(newSubVideoTitle), url: cleanText(newSubVideoUrl) }
+            : v
+        )
+      )
+      setEditingVideoId(null)
+    } else {
+      const newV: VideoItem = {
+        id: `v-${Date.now()}`,
+        title: cleanText(newSubVideoTitle),
+        url: cleanText(newSubVideoUrl),
+        source: "YouTube",
+        duration: "Recorded Stream",
+      }
+      setEditLectureVideos((prev) => [...prev, newV])
     }
-    setEditLectureVideos((prev) => [...prev, newV])
     setNewSubVideoTitle("")
     setNewSubVideoUrl("")
   }
 
   const handleDeleteVideoFromEdit = (vidId: string) => {
+    if (editingVideoId === vidId) {
+      handleCancelEditVideo()
+    }
     setEditLectureVideos((prev) => prev.filter((v) => v.id !== vidId))
   }
 
-  // PDF management inside lecture
+  // PDF management inside lecture (Add + Edit)
+  const handleStartEditPdf = (p: PdfItem) => {
+    setEditingPdfId(p.id)
+    setNewSubPdfTitle(p.title)
+    setNewSubPdfUrl(p.url)
+  }
+
+  const handleCancelEditPdf = () => {
+    setEditingPdfId(null)
+    setNewSubPdfTitle("")
+    setNewSubPdfUrl("")
+  }
+
   const handleAddPdfToEdit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newSubPdfTitle || !newSubPdfUrl) return
-    const newP: PdfItem = {
-      id: `pdf-${Date.now()}`,
-      title: cleanText(newSubPdfTitle),
-      url: cleanText(newSubPdfUrl),
-      size: "PDF",
+    if (!newSubPdfTitle.trim() || !newSubPdfUrl.trim()) return
+
+    if (editingPdfId) {
+      setEditLecturePdfs((prev) =>
+        prev.map((p) =>
+          p.id === editingPdfId
+            ? { ...p, title: cleanText(newSubPdfTitle), url: cleanText(newSubPdfUrl) }
+            : p
+        )
+      )
+      setEditingPdfId(null)
+    } else {
+      const newP: PdfItem = {
+        id: `pdf-${Date.now()}`,
+        title: cleanText(newSubPdfTitle),
+        url: cleanText(newSubPdfUrl),
+        size: "PDF",
+      }
+      setEditLecturePdfs((prev) => [...prev, newP])
     }
-    setEditLecturePdfs((prev) => [...prev, newP])
     setNewSubPdfTitle("")
     setNewSubPdfUrl("")
   }
 
   const handleDeletePdfFromEdit = (pdfId: string) => {
+    if (editingPdfId === pdfId) {
+      handleCancelEditPdf()
+    }
     setEditLecturePdfs((prev) => prev.filter((p) => p.id !== pdfId))
   }
 
-  // Roadmap management inside lecture
+  // Roadmap management inside lecture (Add + Edit)
+  const handleStartEditRoadmap = (m: RoadmapItem) => {
+    setEditingRoadmapId(m.id)
+    setNewSubMapTitle(m.title)
+    setNewSubMapUrl(m.imageUrl)
+    setNewSubMapDesc(m.description || "")
+  }
+
+  const handleCancelEditRoadmap = () => {
+    setEditingRoadmapId(null)
+    setNewSubMapTitle("")
+    setNewSubMapUrl("")
+    setNewSubMapDesc("")
+  }
+
   const handleAddRoadmapToEdit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newSubMapTitle || !newSubMapUrl) return
-    const newM: RoadmapItem = {
-      id: `map-${Date.now()}`,
-      title: cleanText(newSubMapTitle),
-      imageUrl: cleanText(newSubMapUrl),
-      description: newSubMapDesc ? cleanText(newSubMapDesc) : undefined,
+    if (!newSubMapTitle.trim() || !newSubMapUrl.trim()) return
+
+    if (editingRoadmapId) {
+      setEditLectureRoadmaps((prev) =>
+        prev.map((m) =>
+          m.id === editingRoadmapId
+            ? {
+                ...m,
+                title: cleanText(newSubMapTitle),
+                imageUrl: cleanText(newSubMapUrl),
+                description: newSubMapDesc ? cleanText(newSubMapDesc) : undefined,
+              }
+            : m
+        )
+      )
+      setEditingRoadmapId(null)
+    } else {
+      const newM: RoadmapItem = {
+        id: `map-${Date.now()}`,
+        title: cleanText(newSubMapTitle),
+        imageUrl: cleanText(newSubMapUrl),
+        description: newSubMapDesc ? cleanText(newSubMapDesc) : undefined,
+      }
+      setEditLectureRoadmaps((prev) => [...prev, newM])
     }
-    setEditLectureRoadmaps((prev) => [...prev, newM])
     setNewSubMapTitle("")
     setNewSubMapUrl("")
     setNewSubMapDesc("")
   }
 
   const handleDeleteRoadmapFromEdit = (mapId: string) => {
+    if (editingRoadmapId === mapId) {
+      handleCancelEditRoadmap()
+    }
     setEditLectureRoadmaps((prev) => prev.filter((m) => m.id !== mapId))
   }
 
@@ -965,10 +1061,10 @@ export function AdminDashboard({
             >
               <div className="flex items-center gap-2.5">
                 <CreditCard className="size-4" />
-                <span>الاشتراكات والمدفوعات</span>
+                <span>Subscriptions & Payments</span>
               </div>
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-500 border border-amber-500/30">
-                30 ج.م
+                30 EGP
               </span>
             </button>
 
@@ -2293,7 +2389,11 @@ export function AdminDashboard({
                     {editLectureVideos.map((v) => (
                       <div
                         key={v.id}
-                        className="p-3 rounded-xl bg-card border border-border/80 flex items-center justify-between text-xs gap-3"
+                        className={`p-3 rounded-xl bg-card border flex items-center justify-between text-xs gap-3 transition-colors ${
+                          editingVideoId === v.id
+                            ? "border-primary ring-1 ring-primary/40 bg-primary/5"
+                            : "border-border/80"
+                        }`}
                       >
                         <div className="flex items-center gap-2 truncate">
                           <Play className="size-3.5 text-primary shrink-0" />
@@ -2314,8 +2414,16 @@ export function AdminDashboard({
                           </a>
                           <button
                             type="button"
+                            onClick={() => handleStartEditVideo(v)}
+                            className="text-muted-foreground hover:text-primary p-1 hover:bg-primary/10 rounded-md transition-colors cursor-pointer"
+                            title="Edit video title & URL"
+                          >
+                            <Pencil className="size-3.5" />
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => handleDeleteVideoFromEdit(v.id)}
-                            className="text-muted-foreground hover:text-destructive p-1 hover:bg-destructive/10 rounded-md transition-colors"
+                            className="text-muted-foreground hover:text-destructive p-1 hover:bg-destructive/10 rounded-md transition-colors cursor-pointer"
                             title="Delete video"
                           >
                             <Trash2 className="size-3.5" />
@@ -2325,9 +2433,22 @@ export function AdminDashboard({
                     ))}
                   </div>
 
-                  {/* Add Video Form */}
+                  {/* Add / Edit Video Form */}
                   <div className="p-4 rounded-2xl bg-muted/20 border border-border/80 space-y-2.5">
-                    <span className="text-xs font-bold text-foreground">Add New Video Stream:</span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-foreground">
+                        {editingVideoId ? "✏️ Edit Video Stream:" : "Add New Video Stream:"}
+                      </span>
+                      {editingVideoId && (
+                        <button
+                          type="button"
+                          onClick={handleCancelEditVideo}
+                          className="text-[11px] text-muted-foreground hover:text-foreground underline cursor-pointer"
+                        >
+                          Cancel Edit
+                        </button>
+                      )}
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <Input
                         value={newSubVideoTitle}
@@ -2342,15 +2463,26 @@ export function AdminDashboard({
                         className="text-xs bg-card h-9 font-mono"
                       />
                     </div>
-                    <div className="flex justify-end">
+                    <div className="flex justify-end gap-2">
+                      {editingVideoId && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleCancelEditVideo}
+                          className="text-xs h-8 cursor-pointer"
+                        >
+                          Cancel
+                        </Button>
+                      )}
                       <Button
                         type="button"
                         size="sm"
                         onClick={handleAddVideoToEdit}
-                        disabled={!newSubVideoTitle || !newSubVideoUrl}
-                        className="text-xs font-bold h-8"
+                        disabled={!newSubVideoTitle.trim() || !newSubVideoUrl.trim()}
+                        className="text-xs font-bold h-8 cursor-pointer"
                       >
-                        + Add Video
+                        {editingVideoId ? "Save Changes" : "+ Add Video"}
                       </Button>
                     </div>
                   </div>
@@ -2367,7 +2499,11 @@ export function AdminDashboard({
                     {editLecturePdfs.map((p) => (
                       <div
                         key={p.id}
-                        className="p-3 rounded-xl bg-card border border-border/80 flex items-center justify-between text-xs gap-3"
+                        className={`p-3 rounded-xl bg-card border flex items-center justify-between text-xs gap-3 transition-colors ${
+                          editingPdfId === p.id
+                            ? "border-amber-500 ring-1 ring-amber-500/40 bg-amber-500/5"
+                            : "border-border/80"
+                        }`}
                       >
                         <div className="flex items-center gap-2 truncate">
                           <FileText className="size-3.5 text-amber-500 shrink-0" />
@@ -2376,20 +2512,53 @@ export function AdminDashboard({
                             ({p.url})
                           </span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleDeletePdfFromEdit(p.id)}
-                          className="text-muted-foreground hover:text-destructive p-1"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <a
+                            href={p.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-amber-500 hover:text-amber-400 p-1 hover:bg-amber-500/10 rounded-md transition-colors"
+                            title="Open / Preview PDF"
+                          >
+                            <ExternalLink className="size-3.5" />
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditPdf(p)}
+                            className="text-muted-foreground hover:text-amber-500 p-1 hover:bg-amber-500/10 rounded-md transition-colors cursor-pointer"
+                            title="Edit PDF title & URL"
+                          >
+                            <Pencil className="size-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePdfFromEdit(p.id)}
+                            className="text-muted-foreground hover:text-destructive p-1 hover:bg-destructive/10 rounded-md transition-colors cursor-pointer"
+                            title="Delete PDF"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
 
-                  {/* Add PDF Form */}
+                  {/* Add / Edit PDF Form */}
                   <div className="p-4 rounded-2xl bg-muted/20 border border-border/80 space-y-2.5">
-                    <span className="text-xs font-bold text-foreground">Attach PDF Slides:</span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-foreground">
+                        {editingPdfId ? "✏️ Edit PDF Slides:" : "Attach PDF Slides:"}
+                      </span>
+                      {editingPdfId && (
+                        <button
+                          type="button"
+                          onClick={handleCancelEditPdf}
+                          className="text-[11px] text-muted-foreground hover:text-foreground underline cursor-pointer"
+                        >
+                          Cancel Edit
+                        </button>
+                      )}
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <Input
                         value={newSubPdfTitle}
@@ -2400,19 +2569,30 @@ export function AdminDashboard({
                       <Input
                         value={newSubPdfUrl}
                         onChange={(e) => setNewSubPdfUrl(e.target.value)}
-                        placeholder="Direct PDF URL..."
+                        placeholder="Direct PDF URL (OneDrive, Google Drive, direct link)..."
                         className="text-xs bg-card h-9 font-mono"
                       />
                     </div>
-                    <div className="flex justify-end">
+                    <div className="flex justify-end gap-2">
+                      {editingPdfId && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleCancelEditPdf}
+                          className="text-xs h-8 cursor-pointer"
+                        >
+                          Cancel
+                        </Button>
+                      )}
                       <Button
                         type="button"
                         size="sm"
                         onClick={handleAddPdfToEdit}
-                        disabled={!newSubPdfTitle || !newSubPdfUrl}
-                        className="text-xs font-bold h-8 bg-amber-500 hover:bg-amber-600 text-white"
+                        disabled={!newSubPdfTitle.trim() || !newSubPdfUrl.trim()}
+                        className="text-xs font-bold h-8 bg-amber-500 hover:bg-amber-600 text-white cursor-pointer"
                       >
-                        + Add PDF
+                        {editingPdfId ? "Save Changes" : "+ Add PDF"}
                       </Button>
                     </div>
                   </div>
@@ -2429,26 +2609,66 @@ export function AdminDashboard({
                     {editLectureRoadmaps.map((m) => (
                       <div
                         key={m.id}
-                        className="p-3 rounded-xl bg-card border border-border/80 flex items-center justify-between text-xs gap-3"
+                        className={`p-3 rounded-xl bg-card border flex items-center justify-between text-xs gap-3 transition-colors ${
+                          editingRoadmapId === m.id
+                            ? "border-cyan-500 ring-1 ring-cyan-500/40 bg-cyan-500/5"
+                            : "border-border/80"
+                        }`}
                       >
                         <div className="flex items-center gap-2 truncate">
                           <Workflow className="size-3.5 text-cyan-500 shrink-0" />
                           <span className="font-bold text-foreground truncate">{m.title}</span>
+                          <span className="text-[11px] text-muted-foreground truncate font-mono">
+                            ({m.imageUrl})
+                          </span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteRoadmapFromEdit(m.id)}
-                          className="text-muted-foreground hover:text-destructive p-1"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <a
+                            href={m.imageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-cyan-500 hover:text-cyan-400 p-1 hover:bg-cyan-500/10 rounded-md transition-colors"
+                            title="Open / Preview Roadmap"
+                          >
+                            <ExternalLink className="size-3.5" />
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditRoadmap(m)}
+                            className="text-muted-foreground hover:text-cyan-500 p-1 hover:bg-cyan-500/10 rounded-md transition-colors cursor-pointer"
+                            title="Edit Roadmap title & URL"
+                          >
+                            <Pencil className="size-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRoadmapFromEdit(m.id)}
+                            className="text-muted-foreground hover:text-destructive p-1 hover:bg-destructive/10 rounded-md transition-colors cursor-pointer"
+                            title="Delete Roadmap"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
 
-                  {/* Add Roadmap Form */}
+                  {/* Add / Edit Roadmap Form */}
                   <div className="p-4 rounded-2xl bg-muted/20 border border-border/80 space-y-2.5">
-                    <span className="text-xs font-bold text-foreground">Attach Concept Roadmap:</span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-foreground">
+                        {editingRoadmapId ? "✏️ Edit Concept Roadmap:" : "Attach Concept Roadmap:"}
+                      </span>
+                      {editingRoadmapId && (
+                        <button
+                          type="button"
+                          onClick={handleCancelEditRoadmap}
+                          className="text-[11px] text-muted-foreground hover:text-foreground underline cursor-pointer"
+                        >
+                          Cancel Edit
+                        </button>
+                      )}
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <Input
                         value={newSubMapTitle}
@@ -2459,19 +2679,30 @@ export function AdminDashboard({
                       <Input
                         value={newSubMapUrl}
                         onChange={(e) => setNewSubMapUrl(e.target.value)}
-                        placeholder="Image URL..."
+                        placeholder="Image / Map URL (OneDrive, Direct Image)..."
                         className="text-xs bg-card h-9 font-mono"
                       />
                     </div>
-                    <div className="flex justify-end">
+                    <div className="flex justify-end gap-2">
+                      {editingRoadmapId && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleCancelEditRoadmap}
+                          className="text-xs h-8 cursor-pointer"
+                        >
+                          Cancel
+                        </Button>
+                      )}
                       <Button
                         type="button"
                         size="sm"
                         onClick={handleAddRoadmapToEdit}
-                        disabled={!newSubMapTitle || !newSubMapUrl}
-                        className="text-xs font-bold h-8 bg-cyan-600 hover:bg-cyan-700 text-white"
+                        disabled={!newSubMapTitle.trim() || !newSubMapUrl.trim()}
+                        className="text-xs font-bold h-8 bg-cyan-600 hover:bg-cyan-700 text-white cursor-pointer"
                       >
-                        + Add Roadmap
+                        {editingRoadmapId ? "Save Changes" : "+ Add Roadmap"}
                       </Button>
                     </div>
                   </div>
