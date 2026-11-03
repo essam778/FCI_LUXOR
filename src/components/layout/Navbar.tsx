@@ -152,7 +152,7 @@ export function Navbar({ initialUser = null }: NavbarProps) {
               <GraduationCap className="size-5" />
             </div>
             <span className="font-extrabold text-sm sm:text-lg tracking-tight text-foreground truncate">
-             STUDY++
+             STUDY ++
             </span>
           </Link>
 
@@ -328,7 +328,7 @@ export function Navbar({ initialUser = null }: NavbarProps) {
                   <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground">
                     <GraduationCap className="size-4.5" />
                   </div>
-                  <span className="font-extrabold text-sm">STUDY++</span>
+                  <span className="font-extrabold text-sm">STUDY <span className="text-primary">++</span></span>
                 </Link>
                 <Button
                   variant="ghost"

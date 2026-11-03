@@ -27,10 +27,10 @@ export function Footer({ user }: FooterProps) {
               <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">
                 <GraduationCap className="size-4.5" />
               </div>
-              <span className="text-base font-black">STUDY++</span>
+              <span className="text-base font-black">STUDY <span className="text-primary">++</span></span>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              منصة دراسية تفاعلية مخصصة لطلاب كلية الحاسبات والمعلومات والذكاء الاصطناعي بالأقصر (STUDY++).
+              منصة دراسية تفاعلية مخصصة لطلاب كلية الحاسبات والمعلومات والذكاء الاصطناعي بالأقصر (STUDY ++).
             </p>
           </div>
 

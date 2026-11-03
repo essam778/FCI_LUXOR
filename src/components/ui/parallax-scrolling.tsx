@@ -12,7 +12,7 @@ interface ParallaxSectionProps {
 }
 
 export function ParallaxComponent({
-  title = "STUDY++ Academic Hub",
+  title = "STUDY <span class='text-primary'>++</span> Academic Hub",
   subtitle = "Next-Generation Computer Science Education",
   className = "",
 }: ParallaxSectionProps) {
