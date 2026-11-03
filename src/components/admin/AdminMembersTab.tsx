@@ -17,6 +17,9 @@ import {
   UserCheck,
   UserX,
   Clock,
+  CreditCard,
+  Zap,
+  CheckCircle2,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -29,6 +32,7 @@ import {
   deleteAdminMember,
   type AdminMember,
 } from "@/lib/actions/adminMembers"
+import { toggleUserSubscriptionAction } from "@/lib/actions/subscriptions"
 import type { UserRole } from "@/types/database"
 
 interface AdminMembersTabProps {
@@ -146,6 +150,30 @@ export function AdminMembersTab({
   }
 
   // Quick Role Change
+  const handleToggleSubscription = async (member: AdminMember) => {
+    const isCurrentlyActive = member.subscription_status === "active" || member.subscription_status === "lifetime"
+    const targetStatus = isCurrentlyActive ? "unpaid" : "active"
+    const confirmMsg = isCurrentlyActive
+      ? `هل تريد إيقاف اشتراك الطالب "${member.display_name || member.email}" وقفل المقررات له؟`
+      : `هل تريد تفعيل اشتراك الطالب "${member.display_name || member.email}" وفتح جميع المقررات له؟`
+
+    if (!confirm(confirmMsg)) return
+
+    try {
+      const res = await toggleUserSubscriptionAction(member.id, targetStatus)
+      if (res.success) {
+        setMembers((prev) =>
+          prev.map((m) => (m.id === member.id ? { ...m, subscription_status: targetStatus } : m))
+        )
+        onStatusMessage(`تم ${targetStatus === "active" ? "تفعيل" : "إيقاف"} اشتراك الطالب بنجاح ✓`)
+      } else {
+        alert(res.error || "فشل تعديل حالة الاشتراك")
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "حدث خطأ غير متوقع")
+    }
+  }
+
   const handleQuickRole = async (member: AdminMember, newRole: UserRole) => {
     const roleNames: Record<UserRole, string> = {
       student: "طالب",
@@ -403,6 +431,23 @@ export function AdminMembersTab({
                           </span>
                         )}
 
+                        {/* Subscription Status Badge */}
+                        {member.subscription_status === "active" || member.subscription_status === "lifetime" ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 border border-emerald-500/25">
+                            <CheckCircle2 className="size-2.5" />
+                            <span>مفعل (30 ج.م)</span>
+                          </span>
+                        ) : member.subscription_status === "pending" ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/25">
+                            <Clock className="size-2.5" />
+                            <span>طلب قيد المراجعة</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+                            غير مشترك
+                          </span>
+                        )}
+
                         {/* Level Badge */}
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-muted text-muted-foreground border border-border/80">
                           الفرقة {member.level || 1}
@@ -430,6 +475,30 @@ export function AdminMembersTab({
 
                   {/* Actions Bar */}
                   <div className="flex items-center gap-1.5 self-end md:self-auto shrink-0 flex-wrap">
+                    {/* Toggle Subscription Button */}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleToggleSubscription(member)}
+                      className={`text-xs h-8 px-2.5 rounded-xl font-bold gap-1 cursor-pointer ${
+                        member.subscription_status === "active" || member.subscription_status === "lifetime"
+                          ? "text-rose-500 hover:bg-rose-500/10 border-rose-500/30"
+                          : "text-emerald-500 hover:bg-emerald-500/10 border-emerald-500/30"
+                      }`}
+                      title={
+                        member.subscription_status === "active"
+                          ? "إلغاء تفعيل اشتراك الطالب وقفل المواد"
+                          : "تفعيل اشتراك الطالب فورياً وفتح جميع المواد"
+                      }
+                    >
+                      <CreditCard className="size-3.5" />
+                      <span>
+                        {member.subscription_status === "active" || member.subscription_status === "lifetime"
+                          ? "إيقاف الاشتراك"
+                          : "تفعيل الاشتراك"}
+                      </span>
+                    </Button>
+
                     {/* Direct Notify Button */}
                     <Button
                       size="sm"

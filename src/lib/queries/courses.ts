@@ -113,8 +113,7 @@ export async function getCoursesList(): Promise<Course[]> {
                   url: r.url,
                   source: r.source_name || "YouTube",
                 })
-              }
-              if ((r.type === "slide" || r.type === "book") && r.url) {
+              } else if ((r.type === "slide" || r.type === "book") && r.url) {
                 if (!pdfUrl) {
                   pdfUrl = r.url
                   pdfName = r.title
@@ -125,13 +124,46 @@ export async function getCoursesList(): Promise<Course[]> {
                   url: r.url,
                   size: "PDF",
                 })
-              }
-              if (r.type === "roadmap" && r.url) {
+              } else if (
+                (r.type === "roadmap" ||
+                  (r.type === "link" &&
+                    (r.source_name === "roadmap" ||
+                      r.title?.includes("خريطة") ||
+                      r.title?.includes("خريطه") ||
+                      r.title?.includes("مخطط")))) &&
+                r.url
+              ) {
                 roadmapsList.push({
                   id: r.id,
                   title: r.title || "خريطة المفاهيم",
                   imageUrl: r.url,
                 })
+              } else if (r.type === "link" && r.url) {
+                // If the link has .pdf or is named like a slide/book, treat as PDF
+                const isPdf =
+                  r.url.toLowerCase().includes(".pdf") ||
+                  r.title?.toLowerCase().includes("pdf") ||
+                  r.title?.includes("سلايد") ||
+                  r.title?.includes("مذكرة")
+                if (isPdf) {
+                  if (!pdfUrl) {
+                    pdfUrl = r.url
+                    pdfName = r.title
+                  }
+                  pdfsList.push({
+                    id: r.id,
+                    title: r.title || "ملف المحاضرة (PDF)",
+                    url: r.url,
+                    size: "PDF",
+                  })
+                } else {
+                  // Otherwise treat as concept map / external study link
+                  roadmapsList.push({
+                    id: r.id,
+                    title: r.title || "خريطة المفاهيم",
+                    imageUrl: r.url,
+                  })
+                }
               }
             }
           }

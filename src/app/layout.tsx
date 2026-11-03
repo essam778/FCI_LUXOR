@@ -6,6 +6,7 @@ import { Navbar } from "@/components/layout/Navbar"
 import { StudentNotesWidget } from "@/components/notes/StudentNotesWidget"
 import { Footer } from "@/components/layout/Footer"
 import { KineticGrid } from "@/components/ui/kinetic-grid"
+import { SingleDeviceEnforcer } from "@/components/auth/SingleDeviceEnforcer"
 
 const alexandria = Alexandria({
   subsets: ["arabic", "latin"],
@@ -50,6 +51,7 @@ export default async function RootLayout({
     >
       <body className="min-h-screen flex flex-col font-sans bg-background text-foreground antialiased overflow-x-hidden w-full max-w-full">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <SingleDeviceEnforcer />
           <KineticGrid className="min-h-screen flex flex-col w-full">
             <Navbar initialUser={user} />
             <main className="flex-1 w-full max-w-full overflow-x-hidden">{children}</main>

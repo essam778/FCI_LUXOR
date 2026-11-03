@@ -29,10 +29,12 @@ import {
   LayoutDashboard,
   Database,
   UploadCloud,
+  CreditCard,
 } from "lucide-react"
 
 import { AdminMembersTab } from "./AdminMembersTab"
 import { AdminNotificationsTab } from "./AdminNotificationsTab"
+import { AdminSubscriptionsTab } from "./AdminSubscriptionsTab"
 import type { AdminMember } from "@/lib/actions/adminMembers"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -85,7 +87,7 @@ export function AdminDashboard({
 }) {
   // Navigation sidebar view
   const [currentView, setCurrentView] = React.useState<
-    "overview" | "courses" | "resources" | "members" | "announcements" | "system"
+    "overview" | "courses" | "resources" | "members" | "announcements" | "subscriptions" | "system"
   >("courses")
 
   const [preselectedNotifyMember, setPreselectedNotifyMember] = React.useState<AdminMember | null>(null)
@@ -946,6 +948,27 @@ export function AdminDashboard({
               </div>
               <span className="text-[10px] font-mono px-1.5 rounded-md bg-muted text-muted-foreground">
                 {resourcesList.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setCurrentView("subscriptions")
+                setActiveCourseWorkspace(null)
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                currentView === "subscriptions"
+                  ? "bg-primary text-primary-foreground font-black shadow-xs"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <CreditCard className="size-4" />
+                <span>الاشتراكات والمدفوعات</span>
+              </div>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                30 ج.م
               </span>
             </button>
 
@@ -1951,6 +1974,16 @@ export function AdminDashboard({
                 <AdminNotificationsTab
                   initialTargetMember={preselectedNotifyMember}
                   onClearInitialTargetMember={() => setPreselectedNotifyMember(null)}
+                  onStatusMessage={(msg) => {
+                    setSavedStatus(msg)
+                    setTimeout(() => setSavedStatus(null), 3500)
+                  }}
+                />
+              )}
+
+              {/* VIEW: SUBSCRIPTIONS & PAYMENTS */}
+              {currentView === "subscriptions" && (
+                <AdminSubscriptionsTab
                   onStatusMessage={(msg) => {
                     setSavedStatus(msg)
                     setTimeout(() => setSavedStatus(null), 3500)

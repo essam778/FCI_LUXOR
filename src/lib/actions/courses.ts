@@ -354,7 +354,13 @@ export async function syncFullCourseToDatabase(course: Course): Promise<{ succes
         continue
       }
 
-      // Clear previous resources then re-insert fresh set
+      // Backup previous resources first for rollback safety
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: oldResources } = await (client.from("resources") as any)
+        .select("*")
+        .eq("topic_id", dbTopic.id)
+
+      // Clear previous resources to prepare for fresh insert
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (client.from("resources") as any).delete().eq("topic_id", dbTopic.id)
 
@@ -382,7 +388,7 @@ export async function syncFullCourseToDatabase(course: Course): Promise<{ succes
         }
       })
 
-      // ALL PDFs
+      // ALL PDFs (including OneDrive / SharePoint links)
       const pdfs =
         Array.isArray(lec.pdfs) && lec.pdfs.length > 0
           ? lec.pdfs
@@ -403,14 +409,18 @@ export async function syncFullCourseToDatabase(course: Course): Promise<{ succes
       })
 
       // ALL Roadmaps / Mindmaps
+      // NOTE: Postgres enum `resource_type` accepts ('video', 'book', 'slide', 'link').
+      // To strictly avoid enum constraint errors without requiring DB migrations,
+      // roadmaps are stored with type: "link" and source_name: "roadmap".
       if (Array.isArray(lec.roadmaps)) {
         lec.roadmaps.forEach((m, mIdx) => {
           if (m.imageUrl && m.imageUrl.trim()) {
             resourcesToInsert.push({
               topic_id: dbTopic.id,
-              type: "roadmap",
+              type: "link",
               title: m.title || `خريطة المفاهيم ${mIdx + 1}`,
               url: m.imageUrl.trim(),
+              source_name: "roadmap",
               position: 20 + mIdx,
             })
           }
@@ -422,6 +432,11 @@ export async function syncFullCourseToDatabase(course: Course): Promise<{ succes
         const { error: resErr } = await (client.from("resources") as any).insert(resourcesToInsert)
         if (resErr) {
           console.error("[syncFullCourse] Resource insert failed:", resErr.message, JSON.stringify(resourcesToInsert.map(r => ({ type: r.type, url: r.url?.substring(0, 80) }))))
+          // ROLLBACK: Restore previous resources so data (like YouTube videos) is NOT lost
+          if (oldResources && oldResources.length > 0) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (client.from("resources") as any).insert(oldResources)
+          }
           return { success: false, error: `فشل حفظ الملفات المرفقة بالمحاضرة "${lec.title}": ${resErr.message}` }
         }
       }

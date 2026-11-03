@@ -15,6 +15,8 @@ export const revalidate = 0
 export default async function CoursesPage() {
   let userLevel: number = 1
   let displayName: string | null = null
+  let userRole: string = "guest"
+  let subscriptionStatus: string = "unpaid"
 
   try {
     const supabase = await createClient()
@@ -25,19 +27,26 @@ export default async function CoursesPage() {
     if (user) {
       const { data } = await supabase
         .from("profiles")
-        .select("*")
+        .select("level, display_name, role, subscription_status")
         .eq("id", user.id)
         .single()
 
-      const profile = data as { level?: number | null; display_name?: string | null } | null
+      const profile = data as {
+        level?: number | null
+        display_name?: string | null
+        role?: string | null
+        subscription_status?: string | null
+      } | null
 
       if (profile?.level) {
         userLevel = profile.level
       }
       displayName = profile?.display_name || user.email?.split("@")[0] || null
+      userRole = profile?.role || "student"
+      subscriptionStatus = profile?.subscription_status || "unpaid"
     }
   } catch {
-    // If not authenticated, default to level 1
+    // If not authenticated, default to level 1 and guest
   }
 
   const initialCourses = await getCoursesList()
@@ -55,6 +64,8 @@ export default async function CoursesPage() {
         <CoursesExplorer
           userLevel={userLevel}
           userDisplayName={displayName}
+          userRole={userRole}
+          subscriptionStatus={subscriptionStatus}
           initialCourses={initialCourses}
         />
       </React.Suspense>

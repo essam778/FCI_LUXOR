@@ -28,6 +28,7 @@ import type { Course, LectureChapter, VideoItem, PdfItem, RoadmapItem, QuizQuest
 
 interface CourseStudyViewProps {
   course: Course
+  isFreeTrial?: boolean
 }
 
 function parseCourseTitle(title: string): { ar: string; en: string } {
@@ -148,7 +149,7 @@ function getLectureQuizQuestions(lecture: LectureChapter): QuizQuestion[] {
   return []
 }
 
-export function CourseStudyView({ course }: CourseStudyViewProps) {
+export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyViewProps) {
   // Course state strictly from database
   const [activeCourse, setActiveCourse] = React.useState<Course>(course)
 
@@ -274,6 +275,32 @@ export function CourseStudyView({ course }: CourseStudyViewProps) {
         <span>/</span>
         <span className="text-foreground font-bold truncate max-w-[150px] sm:max-w-none">{parsed.ar}</span>
       </nav>
+
+      {/* Free Trial Banner */}
+      {isFreeTrial && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-500/15 via-emerald-500/10 to-transparent border border-emerald-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="size-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+              <Sparkles className="size-5" />
+            </div>
+            <div className="space-y-0.5">
+              <h4 className="text-xs sm:text-sm font-black text-emerald-400">
+                مقرر متاح مجاناً للتجربة والاستكشاف ⚡
+              </h4>
+              <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed">
+                أنت الآن تتصفح مقرر الإلكترونيات كنسخة تجريبية كاملة. لتفعيل باقي مقررات الفصل الدراسي بـ 30 جنيه فقط.
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href="/courses"
+            className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs transition-colors shadow-sm"
+          >
+            <span>استعراض باقي المواد</span>
+          </Link>
+        </div>
+      )}
 
       {/* 2. Course Hero Banner */}
       <div className="rounded-2xl sm:rounded-3xl border border-border/80 bg-card/85 backdrop-blur-xl overflow-hidden shadow-lg space-y-4 sm:space-y-6">

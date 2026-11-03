@@ -52,6 +52,20 @@ function LoginForm() {
           </div>
 
           {/* Error alerts */}
+          {urlError === "session_expired_other_device" && (
+            <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-500">
+              <AlertCircle className="size-4 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-xs font-bold leading-relaxed">
+                  تم تسجيل الخروج لحماية حسابك
+                </p>
+                <p className="text-[11px] text-amber-500/90 leading-relaxed">
+                  تم تسجيل الدخول بحسابك من جهاز أو متصفح آخر. المنصة مخصصة لجهاز واحد فقط لكل طالب لمنع مشاركة الحساب.
+                </p>
+              </div>
+            </div>
+          )}
+
           {(urlError === "auth_callback_failed" || state?.error) && (
             <div className="flex items-start gap-3 p-4 rounded-2xl bg-destructive/8 border border-destructive/25 text-destructive">
               <AlertCircle className="size-4 shrink-0 mt-0.5" />

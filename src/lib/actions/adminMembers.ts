@@ -13,6 +13,7 @@ export interface AdminMember {
   level: number | null
   role: UserRole
   status?: string | null
+  subscription_status?: string | null
   avatar_url?: string | null
   created_at: string
 }
@@ -60,7 +61,7 @@ export async function getAdminMembers(): Promise<AdminMembersResult> {
     // Fetch all profiles
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, display_name, email, university, level, role, status, avatar_url, created_at")
+      .select("id, display_name, email, university, level, role, status, subscription_status, avatar_url, created_at")
       .order("created_at", { ascending: false })
 
     if (error) {

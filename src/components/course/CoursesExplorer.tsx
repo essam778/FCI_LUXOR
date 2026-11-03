@@ -17,6 +17,9 @@ import {
   Calculator,
   Languages,
   Inbox,
+  Lock,
+  Zap,
+  Sparkles,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,10 +27,13 @@ import {
   ACADEMIC_YEARS,
   type Course,
 } from "@/data/coursesData"
+import { isFreeTrialCourse } from "@/lib/actions/subscriptions"
 
 interface CoursesExplorerProps {
   userLevel?: number | null
   userDisplayName?: string | null
+  userRole?: string | null
+  subscriptionStatus?: string | null
   initialCourses?: Course[]
 }
 
@@ -50,7 +56,13 @@ function getCourseIcon(code: string) {
   return BookOpen
 }
 
-export function CoursesExplorer({ userLevel = 1, initialCourses }: CoursesExplorerProps) {
+export function CoursesExplorer({
+  userLevel = 1,
+  userDisplayName,
+  userRole = "student",
+  subscriptionStatus = "unpaid",
+  initialCourses,
+}: CoursesExplorerProps) {
   // Academic year is determined by userLevel
   const selectedYear = userLevel && userLevel >= 1 && userLevel <= 4 ? userLevel : 1
   const [searchQuery, setSearchQuery] = React.useState<string>("")
@@ -134,6 +146,13 @@ export function CoursesExplorer({ userLevel = 1, initialCourses }: CoursesExplor
 
     const semText = course.semester === 1 ? "الترم الأول" : "الترم الثاني"
 
+    const isFree = isFreeTrialCourse(course)
+    const isSubscribed =
+      userRole === "admin" ||
+      userRole === "editor" ||
+      subscriptionStatus === "active" ||
+      subscriptionStatus === "lifetime"
+
     return (
       <Link
         key={course.id}
@@ -168,9 +187,21 @@ export function CoursesExplorer({ userLevel = 1, initialCourses }: CoursesExplor
                 </span>
               </div>
 
-              <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 backdrop-blur-md">
-                معتمد ومتاح
-              </span>
+              {isSubscribed ? (
+                <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 backdrop-blur-md">
+                  معتمد ومتاح
+                </span>
+              ) : isFree ? (
+                <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-emerald-500/25 text-emerald-600 dark:text-emerald-400 border border-emerald-500/40 backdrop-blur-md flex items-center gap-1">
+                  <Zap className="size-3" />
+                  متاح مجاناً للتجربة
+                </span>
+              ) : (
+                <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 backdrop-blur-md flex items-center gap-1">
+                  <Lock className="size-3" />
+                  يتطلب تفعيل (30 ج.م)
+                </span>
+              )}
             </div>
 
             {/* Floating Course Icon */}
@@ -247,6 +278,41 @@ export function CoursesExplorer({ userLevel = 1, initialCourses }: CoursesExplor
           </p>
         </div>
       </div>
+
+      {/* Subscription & Paywall Info Banner */}
+      {!(userRole === "admin" || userRole === "editor" || subscriptionStatus === "active" || subscriptionStatus === "lifetime") && (
+        <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-primary/10 via-card to-card border border-primary/20 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-start">
+          <div className="flex items-center gap-3.5">
+            <div className="size-11 rounded-2xl bg-primary/15 text-primary flex items-center justify-center shrink-0">
+              <Sparkles className="size-5" />
+            </div>
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="text-xs sm:text-sm font-black text-foreground">
+                  تفعيل كافة المقررات بـ 30 جنيه مصري فقط 🚀
+                </h4>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
+                  مقرر الإلكترونيات متاح مجاناً للتجربة
+                </span>
+              </div>
+              <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed">
+                التحويل متاح عبر فودافون كاش أو انستا باي على الرقم:{" "}
+                <strong className="text-foreground font-mono" dir="ltr">01006655209</strong>. ادخل على أي مقرر لإرسال إثبات التحويل وتفعيل الحساب.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+            <Link
+              href="/courses/electronics-fundamentals"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-500 text-xs font-bold transition-colors"
+            >
+              <Zap className="size-3.5" />
+              <span>تجربة الإلكترونيات</span>
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Global Search Bar */}
       <div className="relative max-w-xl">
