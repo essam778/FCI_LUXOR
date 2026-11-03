@@ -105,13 +105,37 @@ export function NotificationBell() {
     }
   }, [])
 
+  // Listen for read updates across multiple mounted instances (desktop + mobile)
+  React.useEffect(() => {
+    const handleSync = (e: Event) => {
+      const custom = e as CustomEvent<string[]>
+      if (custom.detail) {
+        setReadIds(new Set(custom.detail))
+      } else if (typeof window !== "undefined") {
+        const key = currentUserId ? `fci_read_notifs_${currentUserId}` : "fci_read_notifs_guest"
+        const stored = localStorage.getItem(key)
+        if (stored) {
+          try {
+            setReadIds(new Set(JSON.parse(stored)))
+          } catch {
+            // ignore
+          }
+        }
+      }
+    }
+    window.addEventListener("fci_notifs_read_updated", handleSync)
+    return () => window.removeEventListener("fci_notifs_read_updated", handleSync)
+  }, [currentUserId])
+
   React.useEffect(() => {
     fetchDbNotifications()
 
     // 3. Setup Supabase Realtime Subscription for live instant notifications
+    // Use unique channel identifier to avoid duplicate subscription collisions across instances
     const supabase = createClient()
+    const uniqueChannelName = `notifs_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`
     const channel = supabase
-      .channel("realtime:notifications")
+      .channel(uniqueChannelName)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "notifications" },
@@ -180,6 +204,9 @@ export function NotificationBell() {
       try {
         const key = currentUserId ? `fci_read_notifs_${currentUserId}` : "fci_read_notifs_guest"
         localStorage.setItem(key, JSON.stringify(Array.from(allIds)))
+        window.dispatchEvent(
+          new CustomEvent("fci_notifs_read_updated", { detail: Array.from(allIds) })
+        )
       } catch {
         // ignore
       }
@@ -196,6 +223,9 @@ export function NotificationBell() {
         try {
           const key = currentUserId ? `fci_read_notifs_${currentUserId}` : "fci_read_notifs_guest"
           localStorage.setItem(key, JSON.stringify(Array.from(next)))
+          window.dispatchEvent(
+            new CustomEvent("fci_notifs_read_updated", { detail: Array.from(next) })
+          )
         } catch {
           // ignore
         }
