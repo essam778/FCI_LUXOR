@@ -10,6 +10,24 @@ interface FooterProps {
   userDisplayName?: string | null
 }
 
+function InstagramIcon({ className = "size-3.5" }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+      <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
+    </svg>
+  )
+}
+
 export function Footer({ user, userDisplayName }: FooterProps) {
   const pathname = usePathname()
 
@@ -100,19 +118,32 @@ export function Footer({ user, userDisplayName }: FooterProps) {
           <div>
             جميع الحقوق محفوظة &copy; {new Date().getFullYear()} لمنصة <span dir="ltr" className="font-bold">STUDY++</span>.
           </div>
-          <div className="flex items-center gap-1.5 font-medium text-foreground/80 select-none">
-            <span>صُنع بواسطة</span>
-            <span
-              onClick={() => {
-                if (typeof window !== "undefined") {
-                  window.dispatchEvent(new Event("fci_open_admin_modal"))
-                }
-              }}
-              className="font-bold text-primary cursor-pointer hover:underline"
-              title="بوابة الإدارة الآمنة (Ctrl + Shift + A)"
+          <div className="flex items-center gap-3 text-muted-foreground flex-wrap justify-center">
+            <a
+              href="https://www.instagram.com/long.live.muhammad"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-pink-500 transition-colors"
+              title="Instagram: @long.live.muhammad"
             >
-              عصام هشام
-            </span>
+              <InstagramIcon className="size-3.5" />
+              <span>شكر ودعم خاص: <span dir="ltr" className="font-medium">@long.live.muhammad</span></span>
+            </a>
+            <span className="text-border hidden sm:inline">•</span>
+            <div className="flex items-center gap-1.5 font-medium text-foreground/80 select-none">
+              <span>صُنع بواسطة</span>
+              <span
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    window.dispatchEvent(new Event("fci_open_admin_modal"))
+                  }
+                }}
+                className="font-bold text-primary cursor-pointer hover:underline"
+                title="بوابة الإدارة الآمنة (Ctrl + Shift + A)"
+              >
+                عصام هشام
+              </span>
+            </div>
           </div>
         </div>
       </div>
