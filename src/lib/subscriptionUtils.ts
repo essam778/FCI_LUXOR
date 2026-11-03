@@ -20,3 +20,4 @@ export function isFreeTrialCourse(course?: { slug?: string; code?: string; title
     title.includes("الكترونيات")
   )
 }
+
