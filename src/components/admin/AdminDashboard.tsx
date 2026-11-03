@@ -30,6 +30,8 @@ import {
   Database,
   UploadCloud,
   CreditCard,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react"
 
 import { AdminMembersTab } from "./AdminMembersTab"
@@ -474,6 +476,35 @@ export function AdminDashboard({
     setTimeout(() => setSavedStatus(null), 3000)
   }
 
+  // Reorder Lecture up or down and persist to DB
+  const handleMoveLecture = (index: number, direction: "up" | "down") => {
+    if (!activeCourseWorkspace) return
+    const targetIndex = direction === "up" ? index - 1 : index + 1
+    if (targetIndex < 0 || targetIndex >= activeCourseWorkspace.lectures.length) return
+
+    const newLectures = [...activeCourseWorkspace.lectures]
+    const temp = newLectures[index]
+    newLectures[index] = newLectures[targetIndex]
+    newLectures[targetIndex] = temp
+
+    // Re-index lecture numbers strictly from 1 to N
+    const reindexed = newLectures.map((l, i) => ({ ...l, number: i + 1 }))
+
+    const updatedCourse = {
+      ...activeCourseWorkspace,
+      lectures: reindexed,
+    }
+
+    const updatedList = coursesList.map((c) =>
+      c.id === activeCourseWorkspace.id ? updatedCourse : c
+    )
+
+    persistCourses(updatedList, updatedCourse)
+    setActiveCourseWorkspace(updatedCourse)
+    setSavedStatus(`Moved "${temp.title}" ${direction === "up" ? "up" : "down"} successfully.`)
+    setTimeout(() => setSavedStatus(null), 3000)
+  }
+
   // Add Topic
   const handleAddTopic = (e: React.FormEvent) => {
     e.preventDefault()
@@ -854,6 +885,47 @@ export function AdminDashboard({
 
   const handleDeleteQuizQuestion = (qId: string | number) => {
     setEditLectureQuiz((prev) => prev.filter((q) => q.id !== qId))
+  }
+
+  // Media reordering inside Lecture Studio
+  const handleMoveVideoInEdit = (index: number, direction: "up" | "down") => {
+    const targetIndex = direction === "up" ? index - 1 : index + 1
+    if (targetIndex < 0 || targetIndex >= editLectureVideos.length) return
+    const updated = [...editLectureVideos]
+    const temp = updated[index]
+    updated[index] = updated[targetIndex]
+    updated[targetIndex] = temp
+    setEditLectureVideos(updated)
+  }
+
+  const handleMovePdfInEdit = (index: number, direction: "up" | "down") => {
+    const targetIndex = direction === "up" ? index - 1 : index + 1
+    if (targetIndex < 0 || targetIndex >= editLecturePdfs.length) return
+    const updated = [...editLecturePdfs]
+    const temp = updated[index]
+    updated[index] = updated[targetIndex]
+    updated[targetIndex] = temp
+    setEditLecturePdfs(updated)
+  }
+
+  const handleMoveRoadmapInEdit = (index: number, direction: "up" | "down") => {
+    const targetIndex = direction === "up" ? index - 1 : index + 1
+    if (targetIndex < 0 || targetIndex >= editLectureRoadmaps.length) return
+    const updated = [...editLectureRoadmaps]
+    const temp = updated[index]
+    updated[index] = updated[targetIndex]
+    updated[targetIndex] = temp
+    setEditLectureRoadmaps(updated)
+  }
+
+  const handleMoveQuizQuestion = (index: number, direction: "up" | "down") => {
+    const targetIndex = direction === "up" ? index - 1 : index + 1
+    if (targetIndex < 0 || targetIndex >= editLectureQuiz.length) return
+    const updated = [...editLectureQuiz]
+    const temp = updated[index]
+    updated[index] = updated[targetIndex]
+    updated[targetIndex] = temp
+    setEditLectureQuiz(updated)
   }
 
   // Save Edit Lecture Studio
@@ -1319,7 +1391,7 @@ export function AdminDashboard({
                       <p>Use the form below to add the first lecture chapter.</p>
                     </div>
                   ) : (
-                    activeCourseWorkspace.lectures.map((lec) => {
+                    activeCourseWorkspace.lectures.map((lec, lecIdx) => {
                       const vCount = lec.videos?.length || (lec.videoUrl ? 1 : 0)
                       const pCount = lec.pdfs?.length || (lec.pdfUrl ? 1 : 0)
                       const mCount = lec.roadmaps?.length || 0
@@ -1367,11 +1439,33 @@ export function AdminDashboard({
                             </div>
 
                             <div className="flex items-center gap-2 shrink-0">
+                              {/* Up / Down Reorder Controls */}
+                              <div className="flex items-center gap-0.5 bg-muted/40 p-0.5 rounded-xl border border-border/70">
+                                <button
+                                  type="button"
+                                  disabled={lecIdx === 0}
+                                  onClick={() => handleMoveLecture(lecIdx, "up")}
+                                  className="size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-card disabled:opacity-25 disabled:pointer-events-none transition-colors cursor-pointer"
+                                  title="Move Lecture Up (تقديم المحاضرة للأعلى)"
+                                >
+                                  <ChevronUp className="size-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={lecIdx === activeCourseWorkspace.lectures.length - 1}
+                                  onClick={() => handleMoveLecture(lecIdx, "down")}
+                                  className="size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-card disabled:opacity-25 disabled:pointer-events-none transition-colors cursor-pointer"
+                                  title="Move Lecture Down (تأخير المحاضرة للأسفل)"
+                                >
+                                  <ChevronDown className="size-4" />
+                                </button>
+                              </div>
+
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => handleOpenEditLecture(lec)}
-                                className="text-xs font-bold h-8 rounded-xl gap-1 text-primary hover:bg-primary/10"
+                                className="text-xs font-bold h-8 rounded-xl gap-1 text-primary hover:bg-primary/10 cursor-pointer"
                               >
                                 <Pencil className="size-3.5" />
                                 <span>Media & Quiz Studio</span>
@@ -1380,7 +1474,7 @@ export function AdminDashboard({
                               <button
                                 type="button"
                                 onClick={() => handleDeleteLecture(lec.id)}
-                                className="text-muted-foreground hover:text-destructive p-1.5 rounded-lg hover:bg-destructive/10 transition-colors"
+                                className="text-muted-foreground hover:text-destructive p-1.5 rounded-lg hover:bg-destructive/10 transition-colors cursor-pointer"
                                 title="Delete Lecture"
                               >
                                 <Trash2 className="size-4" />
@@ -2388,7 +2482,7 @@ export function AdminDashboard({
                     <h5 className="text-xs font-black text-foreground">
                       Attached Video Streams ({editLectureVideos.length}):
                     </h5>
-                    {editLectureVideos.map((v) => (
+                    {editLectureVideos.map((v, vIdx) => (
                       <div
                         key={v.id}
                         className={`p-3 rounded-xl bg-card border flex items-center justify-between text-xs gap-3 transition-colors ${
@@ -2398,6 +2492,9 @@ export function AdminDashboard({
                         }`}
                       >
                         <div className="flex items-center gap-2 truncate">
+                          <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0">
+                            #{vIdx + 1}
+                          </span>
                           <Play className="size-3.5 text-primary shrink-0" />
                           <span className="font-bold text-foreground truncate">{v.title}</span>
                           <span className="text-[11px] text-muted-foreground truncate font-mono">
@@ -2405,6 +2502,28 @@ export function AdminDashboard({
                           </span>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
+                          {/* Reorder Up / Down */}
+                          <div className="flex items-center gap-0.5 bg-muted/40 p-0.5 rounded-lg border border-border/70">
+                            <button
+                              type="button"
+                              disabled={vIdx === 0}
+                              onClick={() => handleMoveVideoInEdit(vIdx, "up")}
+                              className="size-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:pointer-events-none transition-colors cursor-pointer"
+                              title="Move video up"
+                            >
+                              <ChevronUp className="size-3" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={vIdx === editLectureVideos.length - 1}
+                              onClick={() => handleMoveVideoInEdit(vIdx, "down")}
+                              className="size-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:pointer-events-none transition-colors cursor-pointer"
+                              title="Move video down"
+                            >
+                              <ChevronDown className="size-3" />
+                            </button>
+                          </div>
+
                           <a
                             href={v.url}
                             target="_blank"
@@ -2498,7 +2617,7 @@ export function AdminDashboard({
                     <h5 className="text-xs font-black text-foreground">
                       Attached PDF Slides & Sheets ({editLecturePdfs.length}):
                     </h5>
-                    {editLecturePdfs.map((p) => (
+                    {editLecturePdfs.map((p, pIdx) => (
                       <div
                         key={p.id}
                         className={`p-3 rounded-xl bg-card border flex items-center justify-between text-xs gap-3 transition-colors ${
@@ -2508,6 +2627,9 @@ export function AdminDashboard({
                         }`}
                       >
                         <div className="flex items-center gap-2 truncate">
+                          <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0">
+                            #{pIdx + 1}
+                          </span>
                           <FileText className="size-3.5 text-amber-500 shrink-0" />
                           <span className="font-bold text-foreground truncate">{p.title}</span>
                           <span className="text-[11px] text-muted-foreground truncate font-mono">
@@ -2515,6 +2637,28 @@ export function AdminDashboard({
                           </span>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
+                          {/* Reorder Up / Down */}
+                          <div className="flex items-center gap-0.5 bg-muted/40 p-0.5 rounded-lg border border-border/70">
+                            <button
+                              type="button"
+                              disabled={pIdx === 0}
+                              onClick={() => handleMovePdfInEdit(pIdx, "up")}
+                              className="size-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:pointer-events-none transition-colors cursor-pointer"
+                              title="Move PDF up"
+                            >
+                              <ChevronUp className="size-3" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={pIdx === editLecturePdfs.length - 1}
+                              onClick={() => handleMovePdfInEdit(pIdx, "down")}
+                              className="size-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:pointer-events-none transition-colors cursor-pointer"
+                              title="Move PDF down"
+                            >
+                              <ChevronDown className="size-3" />
+                            </button>
+                          </div>
+
                           <a
                             href={p.url}
                             target="_blank"
@@ -2608,7 +2752,7 @@ export function AdminDashboard({
                     <h5 className="text-xs font-black text-foreground">
                       Attached Concept Maps ({editLectureRoadmaps.length}):
                     </h5>
-                    {editLectureRoadmaps.map((m) => (
+                    {editLectureRoadmaps.map((m, mIdx) => (
                       <div
                         key={m.id}
                         className={`p-3 rounded-xl bg-card border flex items-center justify-between text-xs gap-3 transition-colors ${
@@ -2618,6 +2762,9 @@ export function AdminDashboard({
                         }`}
                       >
                         <div className="flex items-center gap-2 truncate">
+                          <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0">
+                            #{mIdx + 1}
+                          </span>
                           <Workflow className="size-3.5 text-cyan-500 shrink-0" />
                           <span className="font-bold text-foreground truncate">{m.title}</span>
                           <span className="text-[11px] text-muted-foreground truncate font-mono">
@@ -2625,6 +2772,28 @@ export function AdminDashboard({
                           </span>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
+                          {/* Reorder Up / Down */}
+                          <div className="flex items-center gap-0.5 bg-muted/40 p-0.5 rounded-lg border border-border/70">
+                            <button
+                              type="button"
+                              disabled={mIdx === 0}
+                              onClick={() => handleMoveRoadmapInEdit(mIdx, "up")}
+                              className="size-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:pointer-events-none transition-colors cursor-pointer"
+                              title="Move Roadmap up"
+                            >
+                              <ChevronUp className="size-3" />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={mIdx === editLectureRoadmaps.length - 1}
+                              onClick={() => handleMoveRoadmapInEdit(mIdx, "down")}
+                              className="size-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:pointer-events-none transition-colors cursor-pointer"
+                              title="Move Roadmap down"
+                            >
+                              <ChevronDown className="size-3" />
+                            </button>
+                          </div>
+
                           <a
                             href={m.imageUrl}
                             target="_blank"
@@ -2735,19 +2904,42 @@ export function AdminDashboard({
                                 {qIdx + 1}. {q.question}
                               </span>
                               <div className="flex items-center gap-1.5 shrink-0">
+                                {/* Reorder Up / Down */}
+                                <div className="flex items-center gap-0.5 bg-muted/40 p-0.5 rounded-lg border border-border/70">
+                                  <button
+                                    type="button"
+                                    disabled={qIdx === 0}
+                                    onClick={() => handleMoveQuizQuestion(qIdx, "up")}
+                                    className="size-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:pointer-events-none transition-colors cursor-pointer"
+                                    title="Move question up"
+                                  >
+                                    <ChevronUp className="size-3" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={qIdx === editLectureQuiz.length - 1}
+                                    onClick={() => handleMoveQuizQuestion(qIdx, "down")}
+                                    className="size-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:pointer-events-none transition-colors cursor-pointer"
+                                    title="Move question down"
+                                  >
+                                    <ChevronDown className="size-3" />
+                                  </button>
+                                </div>
+
                                 <Button
                                   type="button"
                                   size="sm"
                                   variant="ghost"
                                   onClick={() => handleStartEditQuizQuestion(q, qIdx)}
-                                  className="text-xs h-7 px-2 text-primary font-bold"
+                                  className="text-xs h-7 px-2 text-primary font-bold cursor-pointer"
                                 >
                                   Edit
                                 </Button>
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteQuizQuestion(q.id)}
-                                  className="text-muted-foreground hover:text-destructive p-1"
+                                  className="text-muted-foreground hover:text-destructive p-1 cursor-pointer"
+                                  title="Delete question"
                                 >
                                   <Trash2 className="size-3.5" />
                                 </button>

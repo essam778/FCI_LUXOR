@@ -103,8 +103,12 @@ export async function getCoursesList(): Promise<Course[]> {
               }
             }
 
+            // Sort resources strictly by position
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            for (const r of (t.resources as any[]) || []) {
+            const resourcesSorted = ((t.resources as any[]) || []).slice().sort((a, b) => (a.position || 0) - (b.position || 0))
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            for (const r of resourcesSorted) {
               if (r.type === "video" && r.url) {
                 if (!videoUrl) videoUrl = r.url
                 videosList.push({
