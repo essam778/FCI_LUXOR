@@ -18,7 +18,6 @@ import {
   UserX,
   Clock,
   CreditCard,
-  Zap,
   CheckCircle2,
 } from "lucide-react"
 

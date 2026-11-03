@@ -27,7 +27,7 @@ import {
   ACADEMIC_YEARS,
   type Course,
 } from "@/data/coursesData"
-import { isFreeTrialCourse } from "@/lib/actions/subscriptions"
+import { isFreeTrialCourse } from "@/lib/subscriptionUtils"
 
 interface CoursesExplorerProps {
   userLevel?: number | null
@@ -58,7 +58,6 @@ function getCourseIcon(code: string) {
 
 export function CoursesExplorer({
   userLevel = 1,
-  userDisplayName,
   userRole = "student",
   subscriptionStatus = "unpaid",
   initialCourses,

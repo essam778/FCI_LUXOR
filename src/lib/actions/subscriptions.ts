@@ -26,23 +26,6 @@ export interface PaymentRequestItem {
 }
 
 /**
- * Check if a course is the free trial / demo course.
- * Electronics (ELEC101) or any course with ELEC / electronics in slug/code/title is open for evaluation.
- */
-export function isFreeTrialCourse(course: { slug?: string; code?: string; title?: string }): boolean {
-  const slug = (course.slug || "").toLowerCase()
-  const code = (course.code || "").toLowerCase()
-  const title = (course.title || "").toLowerCase()
-  return (
-    slug.includes("elec") ||
-    code.includes("elec") ||
-    title.includes("electronics") ||
-    title.includes("إلكترونيات") ||
-    title.includes("الكترونيات")
-  )
-}
-
-/**
  * Helper to assert admin or editor caller
  */
 async function assertAdminCaller() {
@@ -238,6 +221,28 @@ export async function submitPaymentRequestAction(
   }
 }
 
+interface RawPaymentRequest {
+  id: string
+  user_id: string
+  payment_method: "vodafone_cash" | "instapay"
+  sender_phone: string
+  reference_number: string
+  amount: number
+  screenshot_url?: string | null
+  status: "pending" | "approved" | "rejected"
+  admin_notes?: string | null
+  created_at: string
+  reviewed_at?: string | null
+}
+
+interface RawProfile {
+  id: string
+  display_name: string | null
+  email: string | null
+  level: number | null
+  university: string | null
+}
+
 /**
  * Fetch all payment requests for Admin review
  */
@@ -249,7 +254,6 @@ export async function getAdminPaymentRequestsAction(): Promise<{
   try {
     const { client } = await assertAdminCaller()
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: requests, error } = await client
       .from("payment_requests")
       .select(`
@@ -271,8 +275,10 @@ export async function getAdminPaymentRequestsAction(): Promise<{
       return { success: false, error: error.message }
     }
 
+    const rawRequests = (requests || []) as RawPaymentRequest[]
+
     // Fetch user profiles for these requests
-    const userIds = Array.from(new Set((requests || []).map((r: any) => r.user_id)))
+    const userIds = Array.from(new Set(rawRequests.map((r) => r.user_id)))
     const usersMap: Record<string, { display_name: string | null; email: string | null; level: number | null; university: string | null }> = {}
 
     if (userIds.length > 0) {
@@ -282,7 +288,8 @@ export async function getAdminPaymentRequestsAction(): Promise<{
         .in("id", userIds)
 
       if (profiles) {
-        profiles.forEach((p: any) => {
+        const rawProfiles = profiles as RawProfile[]
+        rawProfiles.forEach((p) => {
           usersMap[p.id] = {
             display_name: p.display_name,
             email: p.email,
@@ -293,7 +300,7 @@ export async function getAdminPaymentRequestsAction(): Promise<{
       }
     }
 
-    const mapped: PaymentRequestItem[] = (requests || []).map((r: any) => ({
+    const mapped: PaymentRequestItem[] = rawRequests.map((r) => ({
       ...r,
       user: usersMap[r.user_id] || {
         display_name: "مستخدم",

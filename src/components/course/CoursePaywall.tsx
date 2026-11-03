@@ -10,12 +10,10 @@ import {
   Copy,
   Check,
   UploadCloud,
-  FileImage,
   AlertCircle,
   Clock,
   Sparkles,
   ArrowRight,
-  PhoneCall,
   CreditCard,
   Zap,
 } from "lucide-react"

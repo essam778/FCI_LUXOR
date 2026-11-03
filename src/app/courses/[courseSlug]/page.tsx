@@ -5,7 +5,8 @@ import { getCourseBySlug } from "@/lib/queries/courses"
 import { CourseStudyView } from "@/components/course/CourseStudyView"
 import { CoursePaywall } from "@/components/course/CoursePaywall"
 import { createClient, createAdminClient } from "@/lib/supabase/server"
-import { isFreeTrialCourse, type PaymentRequestItem } from "@/lib/actions/subscriptions"
+import type { PaymentRequestItem } from "@/lib/actions/subscriptions"
+import { isFreeTrialCourse } from "@/lib/subscriptionUtils"
 
 interface CoursePageProps {
   params: Promise<{

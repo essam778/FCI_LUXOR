@@ -1,11 +1,9 @@
 "use client"
 
 import * as React from "react"
-import Image from "next/image"
 import {
   CreditCard,
   Search,
-  Filter,
   CheckCircle2,
   XCircle,
   Clock,
@@ -14,12 +12,10 @@ import {
   RefreshCw,
   Copy,
   Check,
-  ShieldCheck,
   Sparkles,
   X,
   Phone,
   Hash,
-  AlertCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -326,7 +322,6 @@ export function AdminSubscriptionsTab({ onStatusMessage }: AdminSubscriptionsTab
           {filteredRequests.map((item) => {
             const isPending = item.status === "pending"
             const isApproved = item.status === "approved"
-            const isRejected = item.status === "rejected"
 
             return (
               <div
