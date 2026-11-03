@@ -16,8 +16,9 @@ import {
   Loader2,
   Eye,
   EyeOff,
-  Sparkles,
+  ExternalLink,
 } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { signup, type AuthActionResult } from "@/lib/actions/auth"
 
 const LEVEL_OPTIONS = [
@@ -34,6 +35,7 @@ export default function SignupPage() {
   )
   const [showPassword, setShowPassword] = React.useState(false)
   const [selectedLevel, setSelectedLevel] = React.useState("2")
+  const [emailInput, setEmailInput] = React.useState("")
 
   return (
     <div className="min-h-[calc(100vh-5rem)] flex items-center justify-center p-4 py-8 relative">
@@ -50,20 +52,22 @@ export default function SignupPage() {
           <div className="h-1.5 w-full bg-gradient-to-r from-emerald-500 via-primary to-sky-500" />
 
           <div className="p-7 sm:p-9 space-y-7">
-            {/* Header */}
-            <div className="text-center space-y-3">
-              <div className="inline-flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/20 to-primary/20 border border-emerald-500/20 text-emerald-500 shadow-lg shadow-emerald-500/10 mb-1">
-                <GraduationCap className="size-7 stroke-[1.8]" />
+            {/* Header (hidden if showing email confirmation) */}
+            {!state?.success && (
+              <div className="text-center space-y-3">
+                <div className="inline-flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/20 to-primary/20 border border-emerald-500/20 text-emerald-500 shadow-lg shadow-emerald-500/10 mb-1">
+                  <GraduationCap className="size-7 stroke-[1.8]" />
+                </div>
+                <div className="space-y-1">
+                  <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+                    إنشاء حساب جديد
+                  </h1>
+                  <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                    انضم لمنصة <span dir="ltr" className="font-bold inline-flex items-center">STUDY<span className="text-primary font-black">++</span></span> وابدأ تنظيم دراستك
+                  </p>
+                </div>
               </div>
-              <div className="space-y-1">
-                <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-                  إنشاء حساب جديد 
-                </h1>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  انضم لمنصة دراسة حاسبات والمعلومات وابدأ تنظيم دراستك
-                </p>
-              </div>
-            </div>
+            )}
 
             {/* Error */}
             {state?.error && (
@@ -73,19 +77,92 @@ export default function SignupPage() {
               </div>
             )}
 
-            {/* Success */}
+            {/* Success: Beautiful Email Confirmation Screen */}
             {state?.success ? (
-              <div className="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-400 space-y-4">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="size-5 shrink-0" />
-                  <span className="font-black text-sm">تم إنشاء الحساب بنجاح!</span>
+              <div className="space-y-6 text-center animate-in fade-in zoom-in-95 duration-300">
+                <div className="relative mx-auto size-20 rounded-3xl bg-gradient-to-tr from-emerald-500/20 to-primary/20 border border-emerald-500/30 flex items-center justify-center text-emerald-500 shadow-xl shadow-emerald-500/10">
+                  <Mail className="size-10 stroke-[1.7]" />
+                  <span className="absolute -top-1 -end-1 flex size-5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full size-5 bg-emerald-500 text-white items-center justify-center">
+                      <CheckCircle2 className="size-3.5" />
+                    </span>
+                  </span>
                 </div>
-                <p className="text-xs leading-relaxed opacity-90">{state.message}</p>
-                <Link href="/login">
-                  <button className="w-full h-10 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors cursor-pointer shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 mt-1">
-                    <span>الانتقال لصفحة تسجيل الدخول</span>
-                  </button>
-                </Link>
+
+                <div className="space-y-2">
+                  <span className="text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 inline-block">
+                    تأكيد البريد الإلكتروني مطلوب
+                  </span>
+                  <h2 className="text-xl sm:text-2xl font-black text-foreground">
+                    تحقق من بريدك الإلكتروني
+                  </h2>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    أرسلنا رابط تأكيد وتفعيل الحساب إلى البريد الإلكتروني التالي:
+                  </p>
+                  <div className="p-3 rounded-2xl bg-muted/40 border border-border/80 font-mono text-primary font-bold text-xs sm:text-sm break-all select-all">
+                    {state.email || emailInput || "بريدك الإلكتروني المسجل"}
+                  </div>
+                </div>
+
+                {/* Steps */}
+                <div className="p-4 rounded-2xl bg-muted/20 border border-border/60 text-start space-y-2.5 text-xs text-muted-foreground">
+                  <div className="flex items-start gap-2.5">
+                    <span className="size-5 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center shrink-0 mt-0.5 text-[11px]">
+                      1
+                    </span>
+                    <span>افتح تطبيق البريد الإلكتروني أو صندوق الوارد في جهازك.</span>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <span className="size-5 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center shrink-0 mt-0.5 text-[11px]">
+                      2
+                    </span>
+                    <span>
+                      ابحث عن رسالة التفعيل من منصة <strong className="text-foreground" dir="ltr">STUDY++</strong> واضغط على زر <strong>Confirm your mail</strong>.
+                    </span>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <span className="size-5 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center shrink-0 mt-0.5 text-[11px]">
+                      3
+                    </span>
+                    <span>بعد الضغط على رابط التأكيد، عُد إلى هنا وسجّل دخولك فوراً.</span>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="space-y-2.5 pt-1">
+                  <Link href="/login" className="block w-full">
+                    <Button className="w-full h-11 rounded-xl bg-gradient-to-r from-emerald-600 to-primary hover:from-emerald-700 hover:to-primary/90 text-white font-bold text-xs sm:text-sm shadow-lg shadow-primary/20 gap-2 cursor-pointer">
+                      <CheckCircle2 className="size-4" />
+                      <span>الانتقال لصفحة تسجيل الدخول</span>
+                    </Button>
+                  </Link>
+
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <a
+                      href="https://mail.google.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="h-9 rounded-xl border border-border bg-card hover:bg-muted/50 text-foreground text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <span>فتح Gmail</span>
+                      <ExternalLink className="size-3 text-muted-foreground" />
+                    </a>
+                    <a
+                      href="https://outlook.live.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="h-9 rounded-xl border border-border bg-card hover:bg-muted/50 text-foreground text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      <span>فتح Outlook</span>
+                      <ExternalLink className="size-3 text-muted-foreground" />
+                    </a>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-muted-foreground/80 leading-relaxed pt-1">
+                  لم تجد الرسالة في صندوق الوارد؟ تحقق من مجلد <strong>الرسائل غير المرغوب فيها (Spam / Junk)</strong>.
+                </p>
               </div>
             ) : (
               <form action={formAction} className="space-y-4">
@@ -96,7 +173,7 @@ export default function SignupPage() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-foreground flex items-center gap-1.5" htmlFor="displayName">
                     <User className="size-3.5 text-emerald-500" />
-                    الاسم بالكامل <span className="text-destructive text-[10px]">*</span>
+                    الاسم بالكامل
                   </label>
                   <input
                     id="displayName"
@@ -112,12 +189,14 @@ export default function SignupPage() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-foreground flex items-center gap-1.5" htmlFor="email">
                     <Mail className="size-3.5 text-primary" />
-                    البريد الإلكتروني <span className="text-destructive text-[10px]">*</span>
+                    البريد الإلكتروني
                   </label>
                   <input
                     id="email"
                     name="email"
                     type="email"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
                     required
                     autoComplete="email"
                     placeholder="name@example.com"
@@ -130,7 +209,7 @@ export default function SignupPage() {
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-foreground flex items-center gap-1.5" htmlFor="password">
                     <Lock className="size-3.5 text-sky-500" />
-                    كلمة المرور <span className="text-destructive text-[10px]">*</span>
+                    كلمة المرور
                   </label>
                   <div className="relative">
                     <input
@@ -166,7 +245,7 @@ export default function SignupPage() {
                       id="university"
                       name="university"
                       type="text"
-                      placeholder="جامعة القاهرة"
+                      placeholder="جامعة الأقصر"
                       className="w-full h-11 rounded-xl border border-border bg-background/60 px-3 text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-all"
                     />
                   </div>
@@ -211,7 +290,7 @@ export default function SignupPage() {
                   ) : (
                     <>
                       <UserPlus className="size-4" />
-                      <span>إنشاء الحساب مجاناً</span>
+                      <span>إنشاء الحساب</span>
                     </>
                   )}
                 </button>
@@ -248,8 +327,7 @@ export default function SignupPage() {
 
         {/* Footer note */}
         <p className="text-center text-[11px] text-muted-foreground/60">
-          <Sparkles className="size-3 inline-block me-1" />
-          منصة دراسة حاسبات والمعلومات — محمية بـ Supabase Auth
+          منصة <span dir="ltr" className="font-bold">STUDY++</span> — نظام دراسي معتمد
         </p>
       </div>
     </div>

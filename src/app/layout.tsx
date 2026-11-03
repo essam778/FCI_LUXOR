@@ -23,9 +23,9 @@ const jetbrainsMono = JetBrains_Mono({
 import { createClient } from "@/lib/supabase/server"
 
 export const metadata: Metadata = {
-  title: "منصة دراسة حاسبات والمعلومات",
+  title: "STUDY++ | المنصة الشاملة لطلاب كلية الحاسبات والمعلومات والذكاء الاصطناعي",
   description:
-    "المنصة الشاملة لطلاب كليات الحاسبات والمعلومات: شروحات منظمة، خرائط ذهنية، بنك أسئلة محلولة، وتكرار متباعد.",
+    "المنصة الشاملة لطلاب كليات الحاسبات والمعلومات STUDY++: شروحات منظمة، خرائط ذهنية، بنك أسئلة محلولة، ومتابعة أكاديمية مستمرة.",
 }
 
 export default async function RootLayout({
@@ -34,10 +34,23 @@ export default async function RootLayout({
   children: React.ReactNode
 }>) {
   let user = null
+  let userDisplayName: string | null = null
   try {
     const supabase = await createClient()
     const { data } = await supabase.auth.getUser()
     user = data.user
+    if (user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", user.id)
+        .maybeSingle()
+      userDisplayName =
+        (profile as { display_name?: string | null } | null)?.display_name ||
+        user.user_metadata?.display_name ||
+        user.user_metadata?.full_name ||
+        null
+    }
   } catch {
     // Fallback gracefully if server cookies cannot be read
   }
@@ -53,9 +66,9 @@ export default async function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <SingleDeviceEnforcer />
           <KineticGrid className="min-h-screen flex flex-col w-full">
-            <Navbar initialUser={user} />
+            <Navbar initialUser={user} initialDisplayName={userDisplayName} />
             <main className="flex-1 w-full max-w-full overflow-x-hidden">{children}</main>
-            <Footer user={user} />
+            <Footer user={user} userDisplayName={userDisplayName} />
             <StudentNotesWidget initialUser={user} />
           </KineticGrid>
         </ThemeProvider>

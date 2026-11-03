@@ -10,6 +10,7 @@ export type AuthActionResult = {
   success?: boolean
   error?: string
   message?: string
+  email?: string
 }
 
 export async function login(
@@ -115,7 +116,8 @@ export async function signup(
 
   return {
     success: true,
-    message: "تم إنشاء الحساب بنجاح! إذا طُلب تأكيد البريد الإلكتروني، يرجى مراجعة صندوق الوارد ثم تسجيل الدخول.",
+    email: parsed.data.email,
+    message: "تم إرسال رابط تأكيد الحساب إلى بريدك الإلكتروني بنجاح! يرجى مراجعة صندوق الوارد والضغط على الرابط لتفعيل حسابك والدخول للمنصة.",
   }
 }
 

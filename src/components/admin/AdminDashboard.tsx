@@ -972,7 +972,9 @@ export function AdminDashboard({
             </div>
             <div>
               <div className="text-base font-black tracking-tight text-foreground flex items-center gap-1.5">
-                <span>STUDY++</span>
+                <span dir="ltr" className="inline-flex items-center">
+                  STUDY<span className="text-primary font-black">++</span>
+                </span>
                 <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary font-bold">
                   PRO
                 </span>

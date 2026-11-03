@@ -434,7 +434,7 @@ export function StudentNotesWidget({ initialUser = null }: StudentNotesWidgetPro
                 {/* Title */}
                 <div className="space-y-1">
                   <label className="text-[11px] font-bold text-muted-foreground">
-                    عنوان الملاحظة <span className="text-destructive">*</span>
+                    عنوان الملاحظة
                   </label>
                   <Input
                     value={formTitle}
@@ -509,7 +509,7 @@ export function StudentNotesWidget({ initialUser = null }: StudentNotesWidgetPro
                 {/* Content */}
                 <div className="space-y-1">
                   <label className="text-[11px] font-bold text-muted-foreground">
-                    نص ومحتوى الملاحظة <span className="text-destructive">*</span>
+                    نص ومحتوى الملاحظة
                   </label>
                   <textarea
                     value={formContent}

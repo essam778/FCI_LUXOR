@@ -7,15 +7,23 @@ import type { User } from "@supabase/supabase-js"
 
 interface FooterProps {
   user?: User | null
+  userDisplayName?: string | null
 }
 
-export function Footer({ user }: FooterProps) {
+export function Footer({ user, userDisplayName }: FooterProps) {
   const pathname = usePathname()
 
   // Hide footer completely on dashboard and admin pages for a clean app feel
   if (pathname?.startsWith("/dashboard") || pathname?.startsWith("/admin")) {
     return null
   }
+
+  const effectiveDisplayName =
+    userDisplayName ||
+    user?.user_metadata?.display_name ||
+    user?.user_metadata?.full_name ||
+    user?.email?.split("@")[0] ||
+    "طالب"
 
   return (
     <footer className="border-t border-border bg-card/60 text-muted-foreground text-sm mt-auto">
@@ -27,10 +35,12 @@ export function Footer({ user }: FooterProps) {
               <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">
                 <GraduationCap className="size-4.5" />
               </div>
-              <span className="text-base font-black">STUDY <span className="text-primary">++</span></span>
+              <span dir="ltr" className="text-base font-black inline-flex items-center">
+                STUDY<span className="text-primary font-black">++</span>
+              </span>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              منصة دراسية تفاعلية مخصصة لطلاب كلية الحاسبات والمعلومات والذكاء الاصطناعي بالأقصر (STUDY ++).
+              منصة دراسية تفاعلية مخصصة لطلاب كلية الحاسبات والمعلومات والذكاء الاصطناعي بالأقصر (<span dir="ltr" className="font-bold">STUDY++</span>).
             </p>
           </div>
 
@@ -60,8 +70,11 @@ export function Footer({ user }: FooterProps) {
                       <span>لوحة التحكم</span>
                     </Link>
                   </li>
-                  <li className="pt-1 text-[11px] text-muted-foreground">
-                    مسجل كـ: <span className="text-foreground font-semibold font-mono">{user.email}</span>
+                  <li className="pt-1 text-[11px] text-muted-foreground flex items-center gap-1 flex-wrap">
+                    <span>مسجل كـ:</span>
+                    <span className="text-foreground font-bold">
+                      {effectiveDisplayName}
+                    </span>
                   </li>
                 </>
               ) : (
@@ -85,7 +98,7 @@ export function Footer({ user }: FooterProps) {
         {/* Bottom Credits Bar */}
         <div className="mt-8 pt-6 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
           <div>
-            جميع الحقوق محفوظة &copy; {new Date().getFullYear()} منصة حاسبات والمعلومات.
+            جميع الحقوق محفوظة &copy; {new Date().getFullYear()} لمنصة <span dir="ltr" className="font-bold">STUDY++</span>.
           </div>
           <div className="flex items-center gap-1.5 font-medium text-foreground/80 select-none">
             <span>صُنع بواسطة</span>

@@ -178,8 +178,7 @@ function LoginForm() {
 
       {/* Footer note */}
       <p className="text-center text-[11px] text-muted-foreground/60">
-        <Sparkles className="size-3 inline-block me-1" />
-        منصة دراسة حاسبات والمعلومات — محمية بـ Supabase Auth
+        منصة <span dir="ltr" className="font-bold">STUDY++</span> — نظام دراسي معتمد
       </p>
     </div>
   )

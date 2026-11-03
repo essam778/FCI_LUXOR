@@ -27,10 +27,12 @@ import type { User } from "@supabase/supabase-js"
 
 interface NavbarProps {
   initialUser?: User | null
+  initialDisplayName?: string | null
 }
 
-export function Navbar({ initialUser = null }: NavbarProps) {
+export function Navbar({ initialUser = null, initialDisplayName = null }: NavbarProps) {
   const [user, setUser] = React.useState<User | null>(initialUser)
+  const [displayName, setDisplayName] = React.useState<string | null>(initialDisplayName)
   const [isAdmin, setIsAdmin] = React.useState(false)
   const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null)
   const [mobileOpen, setMobileOpen] = React.useState(false)
@@ -95,18 +97,21 @@ export function Navbar({ initialUser = null }: NavbarProps) {
     }
   }, [])
 
-  // Fetch profile role and avatar_url directly from Supabase
+  // Fetch profile role, avatar_url, and display_name directly from Supabase
   const fetchProfileData = React.useCallback(async (uid: string) => {
     try {
       const supabase = createClient()
       const { data } = await supabase
         .from("profiles")
-        .select("role, avatar_url")
+        .select("role, avatar_url, display_name")
         .eq("id", uid)
         .single()
       if (data) {
         setIsAdmin((data as { role?: string }).role === "admin")
         setAvatarUrl((data as { avatar_url?: string | null }).avatar_url || null)
+        if ((data as { display_name?: string | null }).display_name) {
+          setDisplayName((data as { display_name?: string | null }).display_name || null)
+        }
       }
     } catch {
       setIsAdmin(false)
@@ -139,6 +144,13 @@ export function Navbar({ initialUser = null }: NavbarProps) {
     setMobileOpen(false)
   }, [pathname])
 
+  const effectiveDisplayName =
+    displayName ||
+    user?.user_metadata?.display_name ||
+    user?.user_metadata?.full_name ||
+    user?.email?.split("@")[0] ||
+    "طالب"
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/70 glass-header">
       <div className="w-full max-w-7xl mx-auto flex h-16 items-center justify-between px-3 sm:px-6">
@@ -151,8 +163,8 @@ export function Navbar({ initialUser = null }: NavbarProps) {
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs ring-1 ring-primary/40 shrink-0">
               <GraduationCap className="size-5" />
             </div>
-            <span className="font-extrabold text-sm sm:text-lg tracking-tight text-foreground truncate">
-             STUDY ++
+            <span dir="ltr" className="font-black text-sm sm:text-lg tracking-tight text-foreground inline-flex items-center">
+              STUDY<span className="text-primary font-black">++</span>
             </span>
           </Link>
 
@@ -204,8 +216,8 @@ export function Navbar({ initialUser = null }: NavbarProps) {
                 aria-expanded={avatarMenuOpen}
               >
                 <StudentAvatar size="sm" userId={user.id} userEmail={user.email} avatarUrl={avatarUrl} />
-                <span className="text-xs font-bold text-foreground max-w-[100px] truncate hidden xl:inline">
-                  {user.email?.split("@")[0]}
+                <span className="text-xs font-bold text-foreground max-w-[130px] truncate hidden sm:inline">
+                  {effectiveDisplayName}
                 </span>
                 <ChevronDown
                   className={`size-3.5 text-muted-foreground transition-transform duration-200 ${
@@ -219,11 +231,14 @@ export function Navbar({ initialUser = null }: NavbarProps) {
                   {/* User Profile Header */}
                   <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-muted/30 border border-border/40">
                     <StudentAvatar size="sm" userId={user.id} userEmail={user.email} avatarUrl={avatarUrl} />
-                    <div className="space-y-0.5 overflow-hidden">
+                    <div className="space-y-0.5 overflow-hidden min-w-0">
                       <div className="text-xs font-bold text-foreground truncate">
+                        {effectiveDisplayName}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground font-mono truncate">
                         {user.email}
                       </div>
-                      <span className="text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-md inline-block">
+                      <span className="text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-md inline-block mt-0.5">
                         {isAdmin ? "مدير المنصة" : "طالب مسجل"}
                       </span>
                     </div>
@@ -328,7 +343,9 @@ export function Navbar({ initialUser = null }: NavbarProps) {
                   <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground">
                     <GraduationCap className="size-4.5" />
                   </div>
-                  <span className="font-extrabold text-sm">STUDY <span className="text-primary">++</span></span>
+                  <span dir="ltr" className="font-black text-sm inline-flex items-center">
+                    STUDY<span className="text-primary font-black">++</span>
+                  </span>
                 </Link>
                 <Button
                   variant="ghost"
@@ -385,8 +402,11 @@ export function Navbar({ initialUser = null }: NavbarProps) {
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40 text-start">
                     <StudentAvatar size="sm" userId={user.id} userEmail={user.email} avatarUrl={avatarUrl} />
-                    <div className="overflow-hidden space-y-0.5">
+                    <div className="overflow-hidden space-y-0.5 min-w-0">
                       <div className="text-xs font-bold text-foreground truncate">
+                        {effectiveDisplayName}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground font-mono truncate">
                         {user.email}
                       </div>
                       <span className="text-[10px] text-muted-foreground">
