@@ -168,7 +168,7 @@ export async function submitPaymentRequestAction(
           })
 
         const timeoutPromise = new Promise<{ data: null; error: { message: string } }>((resolve) =>
-          setTimeout(() => resolve({ data: null, error: { message: "Upload timed out after 10s" } }), 10000)
+          setTimeout(() => resolve({ data: null, error: { message: "Upload timed out after 4s" } }), 4000)
         )
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

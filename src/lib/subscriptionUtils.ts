@@ -26,13 +26,13 @@ export function isFreeTrialCourse(course?: { slug?: string; code?: string; title
  * Downscales huge 10MB mobile screenshots to ~150KB crisp JPEGs in milliseconds,
  * ensuring uploads finish in under 1 second instead of minutes on mobile connections.
  */
-export async function compressReceiptImage(file: File, maxDimension = 1280, quality = 0.75): Promise<File> {
+export async function compressReceiptImage(file: File, maxDimension = 960, quality = 0.65): Promise<File> {
   if (typeof window === "undefined" || !file.type.startsWith("image/")) {
     return file
   }
 
   // If already very lightweight, return as-is
-  if (file.size <= 300 * 1024) {
+  if (file.size <= 150 * 1024) {
     return file
   }
 

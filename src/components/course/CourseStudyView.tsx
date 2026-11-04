@@ -10,7 +10,7 @@ import {
   FileText,
   Play,
   HelpCircle,
-  Sparkles,
+  BookmarkCheck,
   Download,
   ExternalLink,
   Workflow,
@@ -314,11 +314,11 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
         <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-500/15 via-emerald-500/10 to-transparent border border-emerald-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
           <div className="flex items-center gap-3">
             <div className="size-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-              <Sparkles className="size-5" />
+              <CheckCircle2 className="size-5" />
             </div>
             <div className="space-y-0.5">
               <h4 className="text-xs sm:text-sm font-black text-emerald-400">
-                مقرر متاح مجاناً للتجربة والاستكشاف ⚡
+                مقرر متاح للتجربة المجانية
               </h4>
               <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed">
                 أنت الآن تتصفح مقرر الإلكترونيات كنسخة تجريبية كاملة. لتفعيل باقي مقررات الفصل الدراسي بـ 30 جنيه فقط.
@@ -522,18 +522,21 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
                       {/* Sub-item 1: الشرح والفيديوهات (NO AUTOPLAY & NO FRAME BEFORE SELECTION!) */}
                       {videos.length > 0 && (
                         <div className="space-y-2">
-                          {/* Section Header Bar matching User Screenshot */}
+                          {/* Section Header Bar */}
                           <div
                             onClick={() => toggleSection(lecture.id, "video")}
-                            className="bg-[#061510] hover:bg-[#081e16] border border-emerald-500/50 rounded-xl px-4 py-3 sm:py-3.5 flex items-center justify-between cursor-pointer select-none transition-colors"
+                            className="bg-[#061510] hover:bg-[#081e16] border border-emerald-500/50 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 cursor-pointer select-none transition-colors"
                           >
-                            <div className="flex items-center gap-2">
-                              <Video className="size-4 text-emerald-400" />
-                              <span className="text-sm sm:text-base font-bold text-emerald-400">
-                                الشرح ({videos.length})
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <Video className="size-4 text-emerald-400 shrink-0" />
+                              <span className="text-xs sm:text-sm font-bold text-emerald-400 truncate">
+                                الشرح
+                              </span>
+                              <span className="text-[10px] sm:text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 shrink-0">
+                                {videos.length}
                               </span>
                             </div>
-                            <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-emerald-400">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 shrink-0">
                               <span>{isSectionOpen(lecture.id, "video") ? "إخفاء" : "عرض"}</span>
                               <ChevronDown
                                 className={`size-4 transition-transform duration-200 ${
@@ -676,18 +679,21 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
                           {/* Section Header Bar */}
                           <div
                             onClick={() => toggleSection(lecture.id, "quiz")}
-                            className="bg-[#061510] hover:bg-[#081e16] border border-emerald-500/50 rounded-xl px-4 py-3 sm:py-3.5 flex items-center justify-between cursor-pointer select-none transition-colors"
+                            className="bg-[#061510] hover:bg-[#081e16] border border-emerald-500/50 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 cursor-pointer select-none transition-colors"
                           >
-                            <div className="flex items-center gap-2">
-                              <HelpCircle className="size-4 text-emerald-400" />
-                              <span className="text-sm sm:text-base font-bold text-emerald-400">
-                                الاختبار التفاعلي والمفاهيم ({quizQuestions.length} أسئلة)
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <HelpCircle className="size-4 text-emerald-400 shrink-0" />
+                              <span className="text-xs sm:text-sm font-bold text-emerald-400 truncate">
+                                الاختبار التفاعلي والمفاهيم
+                              </span>
+                              <span className="text-[10px] sm:text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 shrink-0">
+                                {quizQuestions.length}
                               </span>
                             </div>
-                            <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-emerald-400">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 shrink-0">
                               {isSubmitted && (
-                                <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300">
-                                  {correctCount} / {quizQuestions.length} ({Math.round((correctCount / quizQuestions.length) * 100)}%)
+                                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300">
+                                  {correctCount}/{quizQuestions.length} ({Math.round((correctCount / quizQuestions.length) * 100)}%)
                                 </span>
                               )}
                               <div className="flex items-center gap-1">
@@ -703,7 +709,7 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
 
                           {/* Section Content - Clean Interactive Launcher Card */}
                           {isSectionOpen(lecture.id, "quiz") && (
-                            <div className="p-4 sm:p-6 rounded-xl border border-emerald-500/30 bg-gradient-to-b from-[#061814] to-[#040e0c] space-y-4 animate-in fade-in-50 duration-150">
+                            <div className="p-3.5 sm:p-6 rounded-xl border border-emerald-500/30 bg-gradient-to-b from-[#061814] to-[#040e0c] space-y-4 animate-in fade-in-50 duration-150">
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                 <div className="space-y-1 text-start">
                                   <div className="flex items-center gap-2">
@@ -722,14 +728,14 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
                                   </p>
                                 </div>
 
-                                <div className="shrink-0 flex items-center gap-2">
+                                <div className="w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                                   {isSubmitted ? (
                                     <>
                                       <Button
                                         onClick={() => handleReviewQuizSession(lecture, quizQuestions)}
-                                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs h-10 px-4 rounded-xl gap-1.5 shadow-lg shadow-emerald-950/40 cursor-pointer"
+                                        className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs h-10 px-4 rounded-xl gap-1.5 cursor-pointer shadow-md"
                                       >
-                                        <Award className="size-4" />
+                                        <Award className="size-4 shrink-0" />
                                         <span>عرض النتيجة ومراجعة الحل</span>
                                       </Button>
                                       <Button
@@ -738,19 +744,18 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
                                           handleResetQuiz(lecture.id)
                                           handleStartQuizSession(lecture, quizQuestions)
                                         }}
-                                        className="text-xs font-bold h-10 px-3 rounded-xl border-slate-700 hover:bg-slate-800 text-slate-200 cursor-pointer gap-1.5"
+                                        className="w-full sm:w-auto text-xs font-bold h-10 px-3 rounded-xl border-slate-700 hover:bg-slate-800 text-slate-200 cursor-pointer gap-1.5"
                                       >
-                                        <RotateCcw className="size-3.5" />
+                                        <RotateCcw className="size-3.5 shrink-0" />
                                         <span>إعادة الاختبار</span>
                                       </Button>
                                     </>
                                   ) : (
                                     <Button
                                       onClick={() => handleStartQuizSession(lecture, quizQuestions)}
-                                      className="btn-primary-glow font-black text-xs sm:text-sm h-11 px-6 rounded-xl gap-2 cursor-pointer shadow-xl shadow-primary/20"
+                                      className="w-full sm:w-auto btn-primary-glow font-bold text-xs sm:text-sm h-11 px-6 rounded-xl cursor-pointer shadow-xl shadow-primary/20"
                                     >
-                                      <Sparkles className="size-4" />
-                                      <span>بدء الاختبار الآن 🚀</span>
+                                      <span>بدء الاختبار الآن</span>
                                     </Button>
                                   )}
                                 </div>
@@ -770,17 +775,19 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
                       {/* Sub-item 3: ما ورد في امتحانات سابقة ونقاط التركيز */}
                       {doctorNotes && doctorNotes.length > 0 && (
                         <div className="space-y-2">
+                          {/* Section Header Bar */}
+                          {/* Section Header Bar */}
                           <div
                             onClick={() => toggleSection(lecture.id, "notes")}
-                            className="bg-[#061510] hover:bg-[#081e16] border border-emerald-500/50 rounded-xl px-4 py-3 sm:py-3.5 flex items-center justify-between cursor-pointer select-none transition-colors"
+                            className="bg-[#061510] hover:bg-[#081e16] border border-emerald-500/50 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 cursor-pointer select-none transition-colors"
                           >
-                            <div className="flex items-center gap-2">
-                              <Sparkles className="size-4 text-emerald-400" />
-                              <span className="text-sm sm:text-base font-bold text-emerald-400">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <BookOpen className="size-4 text-emerald-400 shrink-0" />
+                              <span className="text-xs sm:text-sm font-bold text-emerald-400 truncate">
                                 ما ورد في امتحانات سابقة ونقاط التركيز
                               </span>
                             </div>
-                            <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-emerald-400">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 shrink-0">
                               <span>{isSectionOpen(lecture.id, "notes") ? "إخفاء" : "عرض"}</span>
                               <ChevronDown
                                 className={`size-4 transition-transform duration-200 ${
@@ -792,8 +799,8 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
 
                           {isSectionOpen(lecture.id, "notes") && (
                             <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 sm:p-4 space-y-2.5 text-start animate-in fade-in-50 duration-150">
-                              <div className="flex items-center gap-1.5 text-amber-400 font-black text-xs">
-                                <Sparkles className="size-3.5 shrink-0" />
+                              <div className="flex items-center gap-1.5 text-amber-400 font-bold text-xs">
+                                <BookmarkCheck className="size-3.5 shrink-0" />
                                 <span>توجيهات ونقاط تركيز الدكتور في الامتحانات السابقة:</span>
                               </div>
                               <div className="space-y-2 ps-2 sm:ps-4">
@@ -815,17 +822,21 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
                       {/* Sub-item 4: سلايدات ومذكرات الـ PDF */}
                       {pdfs.length > 0 && (
                         <div className="space-y-2">
+                          {/* Section Header Bar */}
                           <div
                             onClick={() => toggleSection(lecture.id, "pdf")}
-                            className="bg-[#061510] hover:bg-[#081e16] border border-emerald-500/50 rounded-xl px-4 py-3 sm:py-3.5 flex items-center justify-between cursor-pointer select-none transition-colors"
+                            className="bg-[#061510] hover:bg-[#081e16] border border-emerald-500/50 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 cursor-pointer select-none transition-colors"
                           >
-                            <div className="flex items-center gap-2">
-                              <FileText className="size-4 text-emerald-400" />
-                              <span className="text-sm sm:text-base font-bold text-emerald-400">
-                                سلايدات ومذكرات الـ PDF ({pdfs.length})
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <FileText className="size-4 text-emerald-400 shrink-0" />
+                              <span className="text-xs sm:text-sm font-bold text-emerald-400 truncate">
+                                سلايدات ومذكرات الـ PDF
+                              </span>
+                              <span className="text-[10px] sm:text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 shrink-0">
+                                {pdfs.length}
                               </span>
                             </div>
-                            <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-emerald-400">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 shrink-0">
                               <span>{isSectionOpen(lecture.id, "pdf") ? "إخفاء" : "عرض"}</span>
                               <ChevronDown
                                 className={`size-4 transition-transform duration-200 ${
@@ -905,17 +916,21 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
                       {/* Sub-item 5: الخرائط الذهنية والمخططات */}
                       {roadmaps.length > 0 && (
                         <div className="space-y-2">
+                          {/* Section Header Bar */}
                           <div
                             onClick={() => toggleSection(lecture.id, "roadmap")}
-                            className="bg-[#061510] hover:bg-[#081e16] border border-emerald-500/50 rounded-xl px-4 py-3 sm:py-3.5 flex items-center justify-between cursor-pointer select-none transition-colors"
+                            className="bg-[#061510] hover:bg-[#081e16] border border-emerald-500/50 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 cursor-pointer select-none transition-colors"
                           >
-                            <div className="flex items-center gap-2">
-                              <Workflow className="size-4 text-emerald-400" />
-                              <span className="text-sm sm:text-base font-bold text-emerald-400">
-                                الخرائط الذهنية والمخططات ({roadmaps.length})
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <Workflow className="size-4 text-emerald-400 shrink-0" />
+                              <span className="text-xs sm:text-sm font-bold text-emerald-400 truncate">
+                                الخرائط الذهنية والمخططات
+                              </span>
+                              <span className="text-[10px] sm:text-xs font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 shrink-0">
+                                {roadmaps.length}
                               </span>
                             </div>
-                            <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-emerald-400">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 shrink-0">
                               <span>{isSectionOpen(lecture.id, "roadmap") ? "إخفاء" : "عرض"}</span>
                               <ChevronDown
                                 className={`size-4 transition-transform duration-200 ${
@@ -936,14 +951,19 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
                                       className="rounded-xl border border-slate-800 bg-[#0d162a] overflow-hidden hover:border-cyan-500/60 transition-all group"
                                     >
                                       {isOneDriveImg ? (
-                                        <div className="p-4 text-center space-y-2">
-                                          <Cloud className="size-8 text-sky-400 mx-auto" />
-                                          <h6 className="text-xs font-bold text-slate-100">{map.title}</h6>
+                                        <div className="p-4 sm:p-5 text-center space-y-3 bg-[#0d162a]">
+                                          <div className="size-11 rounded-2xl bg-sky-500/10 text-sky-400 flex items-center justify-center mx-auto border border-sky-500/20">
+                                            <Cloud className="size-6 text-sky-400" />
+                                          </div>
+                                          <div className="space-y-0.5">
+                                            <h6 className="text-xs sm:text-sm font-bold text-slate-100 truncate">{map.title}</h6>
+                                            <p className="text-[10px] text-muted-foreground">خريطة ومخطط ذهني مستضاف على OneDrive</p>
+                                          </div>
                                           <a
                                             href={map.imageUrl}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-400 hover:underline"
+                                            className="w-full inline-flex items-center justify-center gap-1.5 text-xs font-bold h-9 px-4 rounded-xl bg-sky-500/15 hover:bg-sky-500 hover:text-white text-sky-300 transition-colors border border-sky-500/30"
                                           >
                                             <span>فتح الصورة في OneDrive</span>
                                             <ExternalLink className="size-3.5" />
@@ -1141,12 +1161,12 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
 
                       <div className="space-y-1">
                         <h2 className="text-xl sm:text-2xl font-black text-foreground">
-                          {isExcellent ? "أداء استثنائي ومتميز! 🏆" : isPassed ? "اجتياز ممتاز للاختبار! 🎯" : "تحتاج لمزيد من المراجعة 📚"}
+                          {isExcellent ? "أداء استثنائي ومتميز" : isPassed ? "اجتياز الاختبار بنجاح" : "بحاجة لمزيد من المراجعة"}
                         </h2>
                         <p className="text-xs sm:text-sm text-muted-foreground">
                           {isPassed
-                            ? "أحسنت! أظهرت فهماً متميزاً لمفاهيم المحاضرة والأسئلة التقنية."
-                            : "راجع التفسير الأكاديمي للأسئلة بالأسفل وأعد المحاولة لترسيخ المفاهيم."}
+                            ? "أظهرت استيعاباً متميزاً لمفاهيم المحاضرة والأسئلة التقنية."
+                            : "يرجى مراجعة التفسير الأكاديمي للأسئلة بالأسفل وإعادة المحاولة لترسيخ المفاهيم."}
                         </p>
                       </div>
 
@@ -1230,7 +1250,7 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
                                   : "bg-rose-500/20 text-rose-300"
                               }`}
                             >
-                              {isCorrect ? "إجابة صحيحة ✓" : isUnanswered ? "لم يتم الإجابة" : "إجابة غير صحيحة ✗"}
+                              {isCorrect ? "إجابة صحيحة" : isUnanswered ? "لم يتم الإجابة" : "إجابة غير صحيحة"}
                             </span>
                           </div>
 
@@ -1280,7 +1300,7 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
                           {q.explanation && (
                             <div className="p-3 rounded-xl bg-muted/40 border border-border/60 text-xs text-muted-foreground space-y-1">
                               <div className="flex items-center gap-1.5 text-primary font-bold text-[11px]">
-                                <Sparkles className="size-3.5" />
+                                <HelpCircle className="size-3.5" />
                                 <span>Academic Explanation / التفسير الأكاديمي:</span>
                               </div>
                               <p dir="ltr" className="text-left font-sans leading-relaxed whitespace-pre-wrap text-foreground/90">
@@ -1432,10 +1452,10 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
                             handleSubmitQuiz(activeQuizSession.lectureId)
                             setActiveQuizSession((prev) => (prev ? { ...prev, isGraded: true } : null))
                           }}
-                          className="btn-primary-glow h-11 px-6 rounded-xl text-xs sm:text-sm font-black gap-2 cursor-pointer shadow-xl shadow-primary/20"
+                          className="btn-primary-glow h-11 px-6 rounded-xl text-xs sm:text-sm font-bold gap-2 cursor-pointer shadow-xl shadow-primary/20"
                         >
-                          <Sparkles className="size-4" />
-                          <span>إنهاء الاختبار ورصد النتيجة 🎯</span>
+                          <CheckCircle2 className="size-4" />
+                          <span>إنهاء الاختبار واعتماد النتيجة</span>
                         </Button>
                       ) : (
                         <Button

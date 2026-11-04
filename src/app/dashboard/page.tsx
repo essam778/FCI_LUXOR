@@ -5,6 +5,7 @@ import { LayoutDashboard, BookOpen, GraduationCap, ShieldCheck, ArrowLeft } from
 import { Button } from "@/components/ui/button"
 import { EditProfileModal } from "@/components/dashboard/EditProfileModal"
 import { StudentAvatar } from "@/components/dashboard/StudentAvatar"
+import { StudentSubscriptionWidget } from "@/components/dashboard/StudentSubscriptionWidget"
 
 import type { Database } from "@/types/database"
 
@@ -34,6 +35,16 @@ export default async function DashboardPage() {
   // Strict role check: ONLY if profile.role === "admin" in database
   const isAdmin = profile?.role === "admin"
 
+  // Fetch user's latest payment request if unpaid
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: latestPaymentReq } = await (supabase as any)
+    .from("payment_requests")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
   return (
     <div className="w-full max-w-5xl mx-auto px-3 sm:px-6 py-6 sm:py-12 space-y-6 sm:space-y-8">
       {/* Welcome & Profile Header */}
@@ -49,7 +60,7 @@ export default async function DashboardPage() {
           <div className="space-y-1 min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-base sm:text-2xl font-black text-foreground leading-snug">
-                مرحباً بك، {displayName} 👋
+                مرحباً بك، {displayName}
               </h1>
               {isAdmin && (
                 <span className="text-[10px] sm:text-[11px] font-bold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0">
@@ -84,6 +95,15 @@ export default async function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* Account Activation & Subscription Section */}
+      <StudentSubscriptionWidget
+        userId={user.id}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        subscriptionStatus={(profile as any)?.subscription_status || (profile as any)?.status || "unpaid"}
+        role={profile?.role || "student"}
+        initialPaymentRequest={latestPaymentReq || null}
+      />
 
       {/* Quick Academic Navigation Banner */}
       <div className="p-5 rounded-2xl bg-primary/10 border border-primary/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

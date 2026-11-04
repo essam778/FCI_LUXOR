@@ -12,7 +12,6 @@ import {
   UploadCloud,
   AlertCircle,
   Clock,
-  Sparkles,
   ArrowRight,
   CreditCard,
   Zap,
@@ -182,7 +181,7 @@ export function CoursePaywall({
         <div className="lg:col-span-5 rounded-3xl border border-border bg-card p-6 sm:p-7 space-y-6 shadow-xs">
           <div className="space-y-2">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-black">
-              <Sparkles className="size-3.5" />
+              <ShieldCheck className="size-3.5" />
               <span>اشتراك رمزي موحد</span>
             </div>
             <div className="flex items-baseline gap-2">
@@ -273,7 +272,7 @@ export function CoursePaywall({
               </div>
 
               <div className="space-y-2 max-w-md mx-auto">
-                <h3 className="text-lg font-black text-foreground">طلب التفعيل الخاص بك قيد المراجعة ⏳</h3>
+                <h3 className="text-lg font-black text-foreground">طلب التفعيل الخاص بك قيد المراجعة والاعتماد</h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   تم استلام بيانات التحويل بنجاح برقم مرجعي:{" "}
                   <strong className="text-foreground font-mono">{pendingReqData.reference_number}</strong>.
@@ -488,8 +487,9 @@ export function CoursePaywall({
                 )}
               </Button>
 
-              <p className="text-[11px] text-center text-muted-foreground">
-                🔒 حسابك مخصص لجهاز واحد فقط لضمان الأمان وعدم مشاركة البيانات.
+              <p className="text-[11px] text-center text-muted-foreground flex items-center justify-center gap-1">
+                <Lock className="size-3 text-muted-foreground" />
+                <span>حسابك مخصص لجهاز واحد فقط لضمان الأمان وعدم مشاركة البيانات.</span>
               </p>
             </form>
           )}
