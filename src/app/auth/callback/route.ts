@@ -16,8 +16,10 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient()
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
-    if (!error) {
+    const { data: authData, error } = await supabase.auth.exchangeCodeForSession(code)
+    if (!error && authData?.user) {
+      const user = authData.user
+
       // Determine correct host for reverse proxies / Vercel
       const forwardedHost = request.headers.get("x-forwarded-host")
       const forwardedProto = request.headers.get("x-forwarded-proto") || "https"
@@ -29,55 +31,55 @@ export async function GET(request: Request) {
         : origin
 
       // Single device session token handling for OAuth user:
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (user) {
-        const deviceToken = crypto.randomUUID()
-        const cookieStore = await cookies()
-        cookieStore.set("fci_device_session", deviceToken, {
-          path: "/",
-          httpOnly: true,
-          sameSite: "lax",
-          secure: process.env.NODE_ENV === "production",
-          maxAge: 60 * 60 * 24 * 30,
-        })
+      const deviceToken = crypto.randomUUID()
+      const cookieStore = await cookies()
+      cookieStore.set("fci_device_session", deviceToken, {
+        path: "/",
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 60 * 60 * 24 * 30,
+      })
 
-        const displayName =
-          user.user_metadata?.full_name ||
-          user.user_metadata?.name ||
-          user.user_metadata?.display_name ||
-          user.email?.split("@")[0] ||
-          "طالب"
+      const displayName =
+        user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
+        user.user_metadata?.display_name ||
+        user.email?.split("@")[0] ||
+        "طالب"
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const client: any = createAdminClient() || supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const client: any = createAdminClient() || supabase
 
-        // Check if existing profile
-        const { data: existingProfile } = await client
+      // Check if existing profile
+      const { data: existingProfile } = await client
+        .from("profiles")
+        .select("id, role, subscription_status")
+        .eq("id", user.id)
+        .maybeSingle()
+
+      if (existingProfile) {
+        // Update active_session_token without overwriting existing role or subscription
+        await client
           .from("profiles")
-          .select("id, role, subscription_status")
-          .eq("id", user.id)
-          .maybeSingle()
-
-        if (existingProfile) {
-          // Update active_session_token without overwriting existing role or subscription
-          await client
-            .from("profiles")
-            .update({ active_session_token: deviceToken })
-            .eq("id", user.id)
-        } else {
-          // Insert fresh profile for new OAuth user
-          await client.from("profiles").insert({
-            id: user.id,
+          .update({
+            active_session_token: deviceToken,
             email: user.email,
             display_name: displayName,
-            role: "student",
-            subscription_status: "unpaid",
-            active_session_token: deviceToken,
           })
-        }
+          .eq("id", user.id)
+      } else {
+        // Insert fresh profile for new OAuth user
+        await client.from("profiles").insert({
+          id: user.id,
+          email: user.email,
+          display_name: displayName,
+          role: "student",
+          subscription_status: "unpaid",
+          active_session_token: deviceToken,
+        })
       }
+
       return NextResponse.redirect(`${baseUrl}${next}`)
     }
   }

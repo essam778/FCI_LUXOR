@@ -35,10 +35,20 @@ function LoginForm() {
     setGoogleError(null)
     try {
       const supabase = createClient()
+      // Ensure any lingering session on this client is completely cleared before starting OAuth
+      try {
+        await supabase.auth.signOut()
+      } catch {
+        // ignore
+      }
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
+          queryParams: {
+            prompt: "select_account",
+          },
         },
       })
       if (error) {

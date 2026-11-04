@@ -126,10 +126,21 @@ export async function logout() {
   try {
     const cookieStore = await cookies()
     cookieStore.delete("fci_device_session")
+    // Explicitly delete all Supabase auth cookies
+    const allCookies = cookieStore.getAll()
+    allCookies.forEach((c) => {
+      if (c.name.startsWith("sb-") || c.name.includes("auth-token")) {
+        cookieStore.delete(c.name)
+      }
+    })
   } catch {
     // ignore
   }
-  await supabase.auth.signOut()
+  try {
+    await supabase.auth.signOut({ scope: "global" })
+  } catch {
+    // ignore
+  }
   revalidatePath("/", "layout")
   redirect("/login")
 }

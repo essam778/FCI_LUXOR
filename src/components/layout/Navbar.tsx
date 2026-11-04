@@ -75,6 +75,10 @@ export function Navbar({ initialUser = null, initialDisplayName = null }: Navbar
   }, [initialUser])
 
   React.useEffect(() => {
+    setDisplayName(initialDisplayName ?? null)
+  }, [initialDisplayName])
+
+  React.useEffect(() => {
     try {
       const supabase = createClient()
       supabase.auth.getUser().then(({ data }) => {
@@ -87,6 +91,11 @@ export function Navbar({ initialUser = null, initialDisplayName = null }: Navbar
         data: { subscription },
       } = supabase.auth.onAuthStateChange((_event, session) => {
         setUser(session?.user ?? null)
+        if (!session?.user) {
+          setDisplayName(null)
+          setIsAdmin(false)
+          setAvatarUrl(null)
+        }
       })
 
       return () => {
@@ -109,9 +118,7 @@ export function Navbar({ initialUser = null, initialDisplayName = null }: Navbar
       if (data) {
         setIsAdmin((data as { role?: string }).role === "admin")
         setAvatarUrl((data as { avatar_url?: string | null }).avatar_url || null)
-        if ((data as { display_name?: string | null }).display_name) {
-          setDisplayName((data as { display_name?: string | null }).display_name || null)
-        }
+        setDisplayName((data as { display_name?: string | null }).display_name || null)
       }
     } catch {
       setIsAdmin(false)
@@ -125,6 +132,7 @@ export function Navbar({ initialUser = null, initialDisplayName = null }: Navbar
     } else {
       setIsAdmin(false)
       setAvatarUrl(null)
+      setDisplayName(null)
     }
   }, [user, fetchProfileData])
 
@@ -143,6 +151,32 @@ export function Navbar({ initialUser = null, initialDisplayName = null }: Navbar
   React.useEffect(() => {
     setMobileOpen(false)
   }, [pathname])
+
+  const [isLoggingOut, setIsLoggingOut] = React.useState(false)
+
+  const handleSignOut = async () => {
+    if (isLoggingOut) return
+    setIsLoggingOut(true)
+    setAvatarMenuOpen(false)
+    setMobileOpen(false)
+    setUser(null)
+    setDisplayName(null)
+    setIsAdmin(false)
+    setAvatarUrl(null)
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+    } catch {
+      // ignore
+    }
+    try {
+      await logout()
+    } catch {
+      // ignore
+    }
+    // Hard refresh navigation to fully wipe client memory, Next.js router cache, and reset layout
+    window.location.href = "/login"
+  }
 
   const effectiveDisplayName =
     displayName ||
@@ -276,15 +310,15 @@ export function Navbar({ initialUser = null, initialDisplayName = null }: Navbar
                   </div>
 
                   <div className="border-t border-border/60 pt-1">
-                    <form action={logout}>
-                      <button
-                        type="submit"
-                        className="flex items-center gap-2.5 w-full p-2 rounded-xl text-xs font-bold text-destructive hover:bg-destructive/10 transition-colors text-start cursor-pointer"
-                      >
-                        <LogOut className="size-4" />
-                        <span>تسجيل الخروج</span>
-                      </button>
-                    </form>
+                    <button
+                      type="button"
+                      onClick={handleSignOut}
+                      disabled={isLoggingOut}
+                      className="flex items-center gap-2.5 w-full p-2 rounded-xl text-xs font-bold text-destructive hover:bg-destructive/10 transition-colors text-start cursor-pointer disabled:opacity-50"
+                    >
+                      <LogOut className="size-4" />
+                      <span>{isLoggingOut ? "جاري تسجيل الخروج..." : "تسجيل الخروج"}</span>
+                    </button>
                   </div>
                 </div>
               )}
@@ -415,16 +449,16 @@ export function Navbar({ initialUser = null, initialDisplayName = null }: Navbar
                     </div>
                   </div>
 
-                  <form action={logout}>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-center gap-2 text-destructive border-destructive/20 hover:bg-destructive/10 text-xs font-bold h-9 cursor-pointer"
-                      type="submit"
-                    >
-                      <LogOut className="size-4" />
-                      <span>تسجيل الخروج</span>
-                    </Button>
-                  </form>
+                  <Button
+                    variant="outline"
+                    onClick={handleSignOut}
+                    disabled={isLoggingOut}
+                    className="w-full justify-center gap-2 text-destructive border-destructive/20 hover:bg-destructive/10 text-xs font-bold h-9 cursor-pointer disabled:opacity-50"
+                    type="button"
+                  >
+                    <LogOut className="size-4" />
+                    <span>{isLoggingOut ? "جاري تسجيل الخروج..." : "تسجيل الخروج"}</span>
+                  </Button>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
