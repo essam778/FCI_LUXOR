@@ -3,6 +3,7 @@
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import {
   BookOpen,
   ChevronDown,
@@ -72,13 +73,13 @@ function getEmbedUrl(rawUrl?: string): string | null {
   if (ytMatch && ytMatch[1]) {
     const videoId = ytMatch[1]
     const listParam = playlistMatch ? `&list=${playlistMatch[1]}` : ""
-    // Standard embed domain with rel=0 for maximum compatibility with regional viewers
-    return `https://www.youtube.com/embed/${videoId}?rel=0&autoplay=0${listParam}`
+    // Privacy-enhanced nocookie embed domain for maximum compatibility and minimal bot blocks
+    return `https://www.youtube-nocookie.com/embed/${videoId}?rel=0&autoplay=0${listParam}`
   }
 
   // Standalone YouTube playlist
   if (playlistMatch && (url.includes("youtube.com") || url.includes("youtu.be"))) {
-    return `https://www.youtube.com/embed/videoseries?list=${playlistMatch[1]}&rel=0`
+    return `https://www.youtube-nocookie.com/embed/videoseries?list=${playlistMatch[1]}&rel=0`
   }
 
   // 3. Vimeo
@@ -192,6 +193,38 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
   // Granular sub-section toggle inside each lecture: video, pdf, notes, topics, roadmap, quiz
   const [openSections, setOpenSections] = React.useState<Record<string, Record<string, boolean>>>({})
 
+  const searchParams = useSearchParams()
+  const targetLectureParam = searchParams.get("lecture")
+
+  React.useEffect(() => {
+    if (targetLectureParam) {
+      const match = activeCourse.lectures.find(
+        (l) => l.id === targetLectureParam || l.id.toLowerCase() === targetLectureParam.toLowerCase()
+      )
+      if (match) {
+        setOpenLectures((prev) => ({ ...prev, [match.id]: true }))
+        setOpenSections((prev) => ({
+          ...prev,
+          [match.id]: {
+            video: true,
+            notes: true,
+            topics: true,
+          },
+        }))
+        const vids = getLectureVideos(match)
+        if (vids.length > 0) {
+          setActiveVideoPerLecture((prev) => ({ ...prev, [match.id]: vids[0].url }))
+        }
+        setTimeout(() => {
+          const el = document.getElementById(`lecture-${match.id}`)
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "start" })
+          }
+        }, 300)
+      }
+    }
+  }, [targetLectureParam, activeCourse.lectures])
+
   const toggleSection = (lectureId: string, section: "video" | "pdf" | "notes" | "topics" | "roadmap" | "quiz") => {
     setOpenSections((prev) => {
       const current = prev[lectureId] || {}
@@ -294,20 +327,32 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
 
   return (
     <div className="w-full max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6 sm:space-y-8 text-start" dir="rtl">
-      {/* 1. Breadcrumb Navigation (Compact for Mobile) */}
-      <nav className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-muted-foreground flex-wrap">
-        <Link href="/" className="hover:text-foreground transition-colors">
-          الرئيسية
+      {/* 1. Top Bar: Breadcrumb + Colorful Exit to All Courses Button */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-border/50">
+        <nav className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-muted-foreground flex-wrap">
+          <Link href="/" className="hover:text-foreground transition-colors">
+            الرئيسية
+          </Link>
+          <span>/</span>
+          <Link href="/courses" className="hover:text-foreground transition-colors">
+            المقررات الدراسية
+          </Link>
+          <span>/</span>
+          <span className="text-muted-foreground">{semText}</span>
+          <span>/</span>
+          <span className="text-foreground font-bold truncate max-w-[150px] sm:max-w-none">{parsed.ar}</span>
+        </nav>
+
+        {/* Colorful Exit to All Courses Button requested by the user */}
+        <Link
+          href="/courses"
+          className="group relative inline-flex items-center gap-2 self-start sm:self-auto px-4 py-2 sm:px-5 sm:py-2.5 rounded-2xl text-xs sm:text-sm font-black text-white shadow-lg overflow-hidden transition-all duration-300 hover:scale-[1.03] active:scale-95 cursor-pointer bg-gradient-to-r from-violet-600 via-fuchsia-600 to-pink-500 hover:from-violet-500 hover:via-fuchsia-500 hover:to-pink-400 shadow-fuchsia-500/25"
+        >
+          <ArrowRight className="size-4 stroke-[2.5] rtl:rotate-0 rotate-180 group-hover:-translate-x-1 transition-transform" />
+          <span>الخروج وتصفح جميع المواد</span>
+          <span className="size-2 rounded-full bg-white/90 animate-ping ms-1" />
         </Link>
-        <span>/</span>
-        <Link href="/courses" className="hover:text-foreground transition-colors">
-          المقررات الدراسية
-        </Link>
-        <span>/</span>
-        <span className="text-muted-foreground">{semText}</span>
-        <span>/</span>
-        <span className="text-foreground font-bold truncate max-w-[150px] sm:max-w-none">{parsed.ar}</span>
-      </nav>
+      </div>
 
       {/* Free Trial Banner */}
       {isFreeTrial && (
@@ -471,6 +516,7 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
               return (
                 <div
                   key={lecture.id || lecIdx}
+                  id={`lecture-${lecture.id}`}
                   className="rounded-2xl border border-slate-800/80 bg-[#070d18] shadow-lg overflow-hidden transition-all duration-200"
                 >
                   {/* Lecture Header Row - Vivid Blue / Azure Banner matching user layout */}
@@ -607,6 +653,42 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
                                           <span>مشاهدة الفيديو على الرابط المباشر</span>
                                           <ExternalLink className="size-3.5" />
                                         </a>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* In-App Consumable Lesson Content / Fallback Viewer */}
+                                  <div className="p-3.5 sm:p-4 bg-[#081224] border-t border-sky-500/25 space-y-2 text-start">
+                                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                                      <div className="flex items-center gap-1.5 text-xs font-bold text-sky-400">
+                                        <FileText className="size-3.5" />
+                                        <span>شرح وتلخيص المحاضرة (محتوى الدرس التفاعلي)</span>
+                                      </div>
+                                      {activeVidUrl && (
+                                        <a
+                                          href={activeVidUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-[11px] font-bold text-sky-300 hover:text-white bg-sky-500/20 hover:bg-sky-500/30 border border-sky-500/30 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1"
+                                        >
+                                          <span>مشاهدة على YouTube</span>
+                                          <ExternalLink className="size-3" />
+                                        </a>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-slate-300 leading-relaxed">
+                                      {lecture.summary || "محتوى وشرح هذه المحاضرة متاح بالكامل ومطابق لمقرر كلية الحاسبات والمعلومات."}
+                                    </p>
+                                    {lecture.topics && lecture.topics.length > 0 && (
+                                      <div className="pt-1 flex flex-wrap gap-1.5">
+                                        {lecture.topics.map((t, idx) => (
+                                          <span
+                                            key={idx}
+                                            className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-slate-800 text-slate-200 border border-slate-700/60"
+                                          >
+                                            • {t.title}
+                                          </span>
+                                        ))}
                                       </div>
                                     )}
                                   </div>
@@ -1049,6 +1131,26 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
             })}
           </div>
         )}
+      </div>
+
+      {/* Bottom Exit Banner: Prominent colorful button to exit to all courses */}
+      <div className="p-6 sm:p-8 rounded-3xl border border-border/80 bg-card/85 backdrop-blur-xl flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-start shadow-md">
+        <div className="space-y-1">
+          <h4 className="text-base sm:text-lg font-black text-foreground">
+            هل ترغب في دراسة مقرر دراسي آخر؟
+          </h4>
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            يمكنك العودة إلى قائمة المقررات الكاملة واستعراض أي مادة بدون التقيد بفصل دراسي معين.
+          </p>
+        </div>
+
+        <Link
+          href="/courses"
+          className="group inline-flex items-center gap-2.5 px-6 py-3 rounded-2xl text-xs sm:text-sm font-black text-white shadow-lg transition-all duration-300 hover:shadow-2xl hover:scale-105 active:scale-95 cursor-pointer bg-gradient-to-r from-violet-600 via-fuchsia-600 to-pink-500 hover:from-violet-500 hover:via-fuchsia-500 hover:to-pink-400 shrink-0"
+        >
+          <ArrowRight className="size-4.5 stroke-[2.5] rtl:rotate-0 rotate-180 group-hover:-translate-x-1.5 transition-transform" />
+          <span>الخروج لجميع المقررات الدراسية</span>
+        </Link>
       </div>
 
       {/* 4. Roadmap Modal */}

@@ -46,17 +46,27 @@ export default async function SingleCoursePage({ params }: CoursePageProps) {
     notFound()
   }
 
-  // 1. Strict Authentication Check: Student must be logged in to enter any course
+  // 1. Free Trial Course (e.g. Electronics ELEC105) is accessible for preview and trial
+  const isFree = isFreeTrialCourse(course)
+
+  // 2. Authentication Check
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   if (!user) {
+    if (isFree) {
+      return (
+        <React.Suspense fallback={<div className="py-20 text-center text-xs text-muted-foreground">جاري تحميل المقرر...</div>}>
+          <CourseStudyView course={course} isFreeTrial={true} />
+        </React.Suspense>
+      )
+    }
     redirect(`/login?redirectTo=/courses/${courseSlug}`)
   }
 
-  // 2. Fetch User Profile & Subscription Status
+  // 3. Fetch User Profile & Subscription Status
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const client: any = createAdminClient() || supabase
 
@@ -69,20 +79,31 @@ export default async function SingleCoursePage({ params }: CoursePageProps) {
   const role = profile?.role || "student"
   const subscriptionStatus = profile?.subscription_status || "unpaid"
 
-  // 3. Superusers (Admin & Editor) always have full access
+  // 4. Superusers (Admin & Editor) always have full access
   if (role === "admin" || role === "editor") {
-    return <CourseStudyView course={course} />
+    return (
+      <React.Suspense fallback={<div className="py-20 text-center text-xs text-muted-foreground">جاري تحميل المقرر...</div>}>
+        <CourseStudyView course={course} />
+      </React.Suspense>
+    )
   }
 
-  // 4. Free Trial Course (e.g. Electronics ELEC101) is open for evaluation to all registered students
-  const isFree = isFreeTrialCourse(course)
+  // 5. Free Trial Course for authenticated students
   if (isFree) {
-    return <CourseStudyView course={course} isFreeTrial={true} />
+    return (
+      <React.Suspense fallback={<div className="py-20 text-center text-xs text-muted-foreground">جاري تحميل المقرر...</div>}>
+        <CourseStudyView course={course} isFreeTrial={true} />
+      </React.Suspense>
+    )
   }
 
-  // 5. Active Paid Subscription has full access
+  // 6. Active Paid Subscription has full access
   if (subscriptionStatus === "active" || subscriptionStatus === "lifetime") {
-    return <CourseStudyView course={course} />
+    return (
+      <React.Suspense fallback={<div className="py-20 text-center text-xs text-muted-foreground">جاري تحميل المقرر...</div>}>
+        <CourseStudyView course={course} />
+      </React.Suspense>
+    )
   }
 
   // 6. Otherwise: Show Paywall & Activation Screen

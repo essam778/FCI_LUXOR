@@ -22,10 +22,46 @@ const jetbrainsMono = JetBrains_Mono({
 
 import { createClient } from "@/lib/supabase/server"
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://fci-luxor-essam778s-projects.vercel.app"
+
 export const metadata: Metadata = {
-  title: "STUDY++ | المنصة الشاملة لطلاب كلية الحاسبات والمعلومات والذكاء الاصطناعي",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "STUDY++ | المنصة الشاملة لطلاب كلية الحاسبات والمعلومات والذكاء الاصطناعي",
+    template: "%s | STUDY++",
+  },
   description:
     "المنصة الشاملة لطلاب كليات الحاسبات والمعلومات STUDY++: شروحات منظمة، خرائط ذهنية، بنك أسئلة محلولة، ومتابعة أكاديمية مستمرة.",
+  icons: {
+    icon: [
+      { url: "/download.jpg", type: "image/jpeg" },
+      { url: "/favicon.ico" },
+    ],
+    shortcut: "/download.jpg",
+    apple: "/download.jpg",
+  },
+  openGraph: {
+    title: "STUDY++ | المنصة الشاملة لطلاب كلية الحاسبات والمعلومات والذكاء الاصطناعي",
+    description: "شروحات منظمة، خرائط ذهنية، بنك أسئلة محلولة، ومتابعة أكاديمية مستمرة.",
+    url: siteUrl,
+    siteName: "STUDY++",
+    images: [
+      {
+        url: "/download.jpg",
+        width: 1200,
+        height: 630,
+        alt: "STUDY++ منصة حاسبات والمعلومات",
+      },
+    ],
+    locale: "ar_EG",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "STUDY++ | المنصة الشاملة لطلاب كلية الحاسبات والمعلومات والذكاء الاصطناعي",
+    description: "شروحات منظمة، خرائط ذهنية، بنك أسئلة محلولة، ومتابعة أكاديمية مستمرة.",
+    images: ["/download.jpg"],
+  },
 }
 
 export default async function RootLayout({

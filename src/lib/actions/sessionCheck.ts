@@ -41,23 +41,26 @@ export async function verifyDeviceSessionAction(): Promise<{
 
     const dbToken = profile?.active_session_token
 
-    // If a session token was previously recorded in DB and does not match this device
-    if (dbToken && clientToken && dbToken !== clientToken) {
-      // Sign out from this device
+    // If no dbToken exists or no clientToken exists yet (e.g. freshly logged in, or test environment),
+    // we do not kick out the user — we preserve session and establish token.
+    if (!dbToken || !clientToken) {
+      if (dbToken && !clientToken) {
+        cookieStore.set("fci_device_session", dbToken, {
+          path: "/",
+          httpOnly: true,
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+          maxAge: 60 * 60 * 24 * 30,
+        })
+      }
+      return { valid: true, isLoggedIn: true }
+    }
+
+    // Only if BOTH tokens exist, are non-empty, and mismatch:
+    if (dbToken !== clientToken) {
       cookieStore.delete("fci_device_session")
       await supabase.auth.signOut()
       return { valid: false, isLoggedIn: false, reason: "other_device" }
-    }
-
-    // If client has no session token recorded (e.g. legacy session), set it now
-    if (!clientToken && dbToken) {
-      cookieStore.set("fci_device_session", dbToken, {
-        path: "/",
-        httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 60 * 60 * 24 * 30,
-      })
     }
 
     return { valid: true, isLoggedIn: true }

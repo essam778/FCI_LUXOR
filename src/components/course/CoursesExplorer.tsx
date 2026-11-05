@@ -3,6 +3,7 @@
 import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   BookOpen,
   Layers,
@@ -70,8 +71,35 @@ export function CoursesExplorer({
   const [currentView, setCurrentView] = React.useState<"semesters_boxes" | "semester_details">("semesters_boxes")
   const [activeSemester, setActiveSemester] = React.useState<1 | 2>(1)
 
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
   // Courses list strictly from database props
   const [allCourses, setAllCourses] = React.useState<Course[]>(initialCourses || [])
+
+  // Deep linking: If ?lecture=... is present in URL, redirect directly to that course!
+  React.useEffect(() => {
+    const lectureParam = searchParams.get("lecture")
+    if (lectureParam && allCourses.length > 0) {
+      const foundCourse = allCourses.find((c) =>
+        c.lectures.some((l) => l.id === lectureParam || l.id.toLowerCase() === lectureParam.toLowerCase())
+      )
+      if (foundCourse) {
+        router.push(`/courses/${foundCourse.slug || foundCourse.id}?lecture=${lectureParam}`)
+      } else {
+        router.push(`/courses/electronics-fundamentals?lecture=${lectureParam}`)
+      }
+    }
+  }, [searchParams, allCourses, router])
+
+  // Sync with ?semester=1 or ?semester=2
+  React.useEffect(() => {
+    const semParam = searchParams.get("semester")
+    if (semParam === "1" || semParam === "2") {
+      setActiveSemester(Number(semParam) as 1 | 2)
+      setCurrentView("semester_details")
+    }
+  }, [searchParams])
 
   React.useEffect(() => {
     if (initialCourses) {
@@ -481,16 +509,42 @@ export function CoursesExplorer({
       ) : (
         /* VIEW 3: INSIDE SEMESTER VIEW (Cards linking directly to course pages) */
         <div className="space-y-6">
-          {/* Back Navigation Button */}
-          <div className="flex items-center justify-start pb-4 border-b border-border/60">
+          {/* Top Switcher & Back Navigation (Issue 5 Fix) */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border/60">
             <button
               type="button"
               onClick={() => setCurrentView("semesters_boxes")}
-              className="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black bg-primary/20 text-primary border-2 border-primary shadow-[0_0_20px_rgba(132,204,22,0.35)] hover:shadow-[0_0_30px_rgba(132,204,22,0.6)] hover:bg-primary hover:text-primary-foreground transition-all duration-300 cursor-pointer active:scale-95"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-muted hover:bg-muted/80 text-foreground border border-border/80 transition-all cursor-pointer w-fit"
             >
-              <ArrowRight className="size-4.5 stroke-[2.5]" />
+              <ArrowRight className="size-4 rtl:rotate-0 rotate-180" />
               <span>العودة لاختيار الفصل الدراسي</span>
             </button>
+
+            {/* Direct Semester Switcher Tabs */}
+            <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-muted/60 border border-border/60">
+              <button
+                type="button"
+                onClick={() => setActiveSemester(1)}
+                className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                  activeSemester === 1
+                    ? "bg-primary text-primary-foreground shadow-md"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                الفصل الدراسي الأول ({term1Courses.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSemester(2)}
+                className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                  activeSemester === 2
+                    ? "bg-primary text-primary-foreground shadow-md"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                الفصل الدراسي الثاني ({term2Courses.length})
+              </button>
+            </div>
           </div>
 
           {/* Heading for this Semester */}

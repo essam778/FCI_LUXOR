@@ -2,9 +2,9 @@
 
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
-import { cookies } from "next/headers"
+import { cookies, headers } from "next/headers"
 import { createClient, createAdminClient } from "@/lib/supabase/server"
-import { loginSchema, signupSchema } from "@/lib/validators/auth"
+import { loginSchema, signupSchema, resetPasswordSchema, updatePasswordSchema } from "@/lib/validators/auth"
 
 export type AuthActionResult = {
   success?: boolean
@@ -82,6 +82,7 @@ export async function signup(
     displayName: formData.get("displayName"),
     email: formData.get("email"),
     password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword"),
     university: formData.get("university") || undefined,
     level: formData.get("level") || undefined,
   }
@@ -118,6 +119,68 @@ export async function signup(
     success: true,
     email: parsed.data.email,
     message: "تم إرسال رابط تأكيد الحساب إلى بريدك الإلكتروني بنجاح! يرجى مراجعة صندوق الوارد والضغط على الرابط لتفعيل حسابك والدخول للمنصة.",
+  }
+}
+
+export async function requestPasswordReset(
+  prevState: AuthActionResult | null,
+  formData: FormData
+): Promise<AuthActionResult> {
+  const rawData = {
+    email: formData.get("email"),
+  }
+
+  const parsed = resetPasswordSchema.safeParse(rawData)
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message }
+  }
+
+  const headerList = await headers()
+  const origin = headerList.get("origin") || headerList.get("host") || "https://study-plus-plus.vercel.app"
+  const formattedOrigin = origin.startsWith("http") ? origin : `https://${origin}`
+
+  const supabase = await createClient()
+  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
+    redirectTo: `${formattedOrigin}/reset-password`,
+  })
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  return {
+    success: true,
+    email: parsed.data.email,
+    message: "تم إرسال رابط استعادة كلمة المرور إلى بريدك الإلكتروني بنجاح! يرجى فحص صندوق الوارد والرسائل غير المرغوبة (Spam).",
+  }
+}
+
+export async function updatePassword(
+  prevState: AuthActionResult | null,
+  formData: FormData
+): Promise<AuthActionResult> {
+  const rawData = {
+    password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword"),
+  }
+
+  const parsed = updatePasswordSchema.safeParse(rawData)
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message }
+  }
+
+  const supabase = await createClient()
+  const { error } = await supabase.auth.updateUser({
+    password: parsed.data.password,
+  })
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  return {
+    success: true,
+    message: "تم تغيير كلمة المرور بنجاح! يمكنك الآن تسجيل الدخول بكلمة المرور الجديدة.",
   }
 }
 

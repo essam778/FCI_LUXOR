@@ -64,9 +64,9 @@ export function Footer({ user, userDisplayName }: FooterProps) {
 
           {/* Left side (End in RTL): Quick Links */}
           <div className="space-y-3 md:text-start self-start md:self-auto">
-            <h4 className="font-bold text-foreground text-xs uppercase tracking-wider">
+            <h3 className="font-bold text-foreground text-xs uppercase tracking-wider">
               روابط سريعة
-            </h4>
+            </h3>
             <ul className="space-y-2 text-xs">
               <li>
                 <Link

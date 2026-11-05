@@ -91,7 +91,7 @@ export function NotificationBell() {
         .from("notifications")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(40)
+        .limit(15)
 
       if (error) {
         console.warn("Could not fetch notifications from Supabase:", error.message)
@@ -290,7 +290,32 @@ export function NotificationBell() {
             ) : (
               visibleNotifications.map((item) => {
                 const isUnread = !readIds.has(item.id)
-                const targetLink = item.link && item.link.trim() ? item.link : "/courses"
+                let targetLink = item.link && item.link.trim() ? item.link : "/courses"
+                const lowerText = `${item.title} ${item.message}`.toLowerCase()
+                if (targetLink === "/courses" || !item.link) {
+                  if (
+                    lowerText.includes("أشباه الموصلات") ||
+                    lowerText.includes("إلكترونيات") ||
+                    lowerText.includes("semiconductor") ||
+                    lowerText.includes("electronics")
+                  ) {
+                    targetLink = "/courses/electronics-fundamentals?lecture=elec-lec-1"
+                  } else if (
+                    lowerText.includes("برمجة") ||
+                    lowerText.includes("programming") ||
+                    lowerText.includes("c++")
+                  ) {
+                    targetLink = "/courses/structured-programming"
+                  } else if (
+                    lowerText.includes("تفاضل") ||
+                    lowerText.includes("رياضيات") ||
+                    lowerText.includes("calculus")
+                  ) {
+                    targetLink = "/courses/calculus-1"
+                  } else if (lowerText.includes("فيزياء") || lowerText.includes("physics")) {
+                    targetLink = "/courses/physics-1"
+                  }
+                }
                 const isPersonal = item.target_type === "user" && item.target_user_id === currentUserId
                 const isLevel = item.target_type === "level"
 
@@ -344,9 +369,9 @@ export function NotificationBell() {
                         )}
                       </div>
 
-                      <h4 className="text-xs font-black text-foreground flex items-center gap-1.5 leading-snug">
+                      <p className="text-xs font-black text-foreground flex items-center gap-1.5 leading-snug">
                         <span>{item.title}</span>
-                      </h4>
+                      </p>
                       <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2">
                         {item.message}
                       </p>

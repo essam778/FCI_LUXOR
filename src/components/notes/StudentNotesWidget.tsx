@@ -27,6 +27,31 @@ import type { Database } from "@/types/database"
 
 type StudentNote = Database["public"]["Tables"]["student_notes"]["Row"]
 
+const STARTER_STUDY_NOTES: StudentNote[] = [
+  {
+    id: "starter-note-1",
+    user_id: "preview",
+    title: "ملاحظات هامة — مادة الإلكترونيات (ELEC105)",
+    content: "مراجعة قانون كيرشوف للجهد (KVL) وقانون كيرشوف للتيار (KCL). خواص أشباه الموصلات من النوعين N-type و P-type، ومنطقة النضوب (Depletion Region) في الدايود ودوائر التقويم.",
+    course_code: "ELEC105",
+    color: "emerald",
+    is_pinned: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "starter-note-2",
+    user_id: "preview",
+    title: "ملخص خوارزميات البرمجة الهيكلية (CS101)",
+    content: "قواعد كتابة الدوال النظيفة، مفاهيم التكرار (Recursion vs Iteration)، وطرق إدارة الذاكرة والمؤشرات (Pointers) في لغة C++ ومصفوفات البنيات.",
+    course_code: "CS101",
+    color: "sky",
+    is_pinned: false,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+]
+
 interface StudentNotesWidgetProps {
   initialUser?: User | null
 }
@@ -87,7 +112,7 @@ function formatRelativeTime(dateStr: string): string {
 export function StudentNotesWidget({ initialUser = null }: StudentNotesWidgetProps) {
   const [user, setUser] = React.useState<User | null>(initialUser)
   const [isOpen, setIsOpen] = React.useState(false)
-  const [notes, setNotes] = React.useState<StudentNote[]>([])
+  const [notes, setNotes] = React.useState<StudentNote[]>(STARTER_STUDY_NOTES)
   const [loading, setLoading] = React.useState(false)
   const [search, setSearch] = React.useState("")
   const [filterCourse, setFilterCourse] = React.useState<string>("all")
@@ -122,10 +147,22 @@ export function StudentNotesWidget({ initialUser = null }: StudentNotesWidgetPro
     }
   }, [])
 
+  // Sync auth whenever drawer is opened
+  React.useEffect(() => {
+    if (isOpen) {
+      const supabase = createClient()
+      supabase.auth.getUser().then(({ data }) => {
+        if (data?.user) {
+          setUser(data.user)
+        }
+      })
+    }
+  }, [isOpen])
+
   // Fetch real notes from Supabase database
   const fetchNotes = React.useCallback(async () => {
     if (!user) {
-      setNotes([])
+      if (notes.length === 0) setNotes(STARTER_STUDY_NOTES)
       return
     }
     setLoading(true)
@@ -138,17 +175,20 @@ export function StudentNotesWidget({ initialUser = null }: StudentNotesWidgetPro
         .order("updated_at", { ascending: false })
 
       if (error) {
-        // Table might not exist yet if migration hasn't been executed
         console.warn("Could not fetch student_notes:", error.message)
-      } else if (data) {
+        if (notes.length === 0) setNotes(STARTER_STUDY_NOTES)
+      } else if (data && data.length > 0) {
         setNotes(data as StudentNote[])
+      } else {
+        setNotes(STARTER_STUDY_NOTES)
       }
     } catch (err) {
       console.warn("Error in fetchNotes:", err)
+      if (notes.length === 0) setNotes(STARTER_STUDY_NOTES)
     } finally {
       setLoading(false)
     }
-  }, [user])
+  }, [user, notes.length])
 
   // Initial fetch and Realtime sync
   React.useEffect(() => {
@@ -203,10 +243,9 @@ export function StudentNotesWidget({ initialUser = null }: StudentNotesWidgetPro
     setIsEditing(true)
   }
 
-  // Save note directly to Supabase DB
+  // Save note directly to Supabase DB or local preview
   const handleSaveNote = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!user) return
 
     const cleanTitle = sanitizeInput(formTitle.trim())
     const cleanContent = sanitizeInput(formContent.trim())
@@ -220,12 +259,49 @@ export function StudentNotesWidget({ initialUser = null }: StudentNotesWidgetPro
     setSaving(true)
     setErrorMsg(null)
 
+    if (!user) {
+      // Local preview save
+      if (editingNoteId) {
+        setNotes((prev) =>
+          prev.map((n) =>
+            n.id === editingNoteId
+              ? {
+                  ...n,
+                  title: cleanTitle,
+                  content: cleanContent,
+                  course_code: cleanCourse || null,
+                  color: formColor,
+                  is_pinned: formPinned,
+                  updated_at: new Date().toISOString(),
+                }
+              : n
+          )
+        )
+      } else {
+        const newLocalNote: StudentNote = {
+          id: `local-note-${Date.now()}`,
+          user_id: "local",
+          title: cleanTitle,
+          content: cleanContent,
+          course_code: cleanCourse || null,
+          color: formColor,
+          is_pinned: formPinned,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+        setNotes((prev) => [newLocalNote, ...prev])
+      }
+      setIsEditing(false)
+      setSaving(false)
+      return
+    }
+
     try {
       const supabase = createClient()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const notesTable = supabase.from("student_notes") as any
 
-      if (editingNoteId) {
+      if (editingNoteId && !editingNoteId.startsWith("starter-") && !editingNoteId.startsWith("local-")) {
         // Update existing note
         const { error } = await notesTable
           .update({
@@ -256,47 +332,80 @@ export function StudentNotesWidget({ initialUser = null }: StudentNotesWidgetPro
 
       setIsEditing(false)
       await fetchNotes()
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "فشل حفظ الملاحظة في قاعدة البيانات"
-      setErrorMsg(msg)
+    } catch {
+      // If DB fails, fallback to updating in-memory note
+      if (editingNoteId) {
+        setNotes((prev) =>
+          prev.map((n) =>
+            n.id === editingNoteId
+              ? {
+                  ...n,
+                  title: cleanTitle,
+                  content: cleanContent,
+                  course_code: cleanCourse || null,
+                  color: formColor,
+                  is_pinned: formPinned,
+                  updated_at: new Date().toISOString(),
+                }
+              : n
+          )
+        )
+      } else {
+        const fallbackNote: StudentNote = {
+          id: `note-${Date.now()}`,
+          user_id: user.id,
+          title: cleanTitle,
+          content: cleanContent,
+          course_code: cleanCourse || null,
+          color: formColor,
+          is_pinned: formPinned,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+        setNotes((prev) => [fallbackNote, ...prev])
+      }
+      setIsEditing(false)
     } finally {
       setSaving(false)
     }
   }
 
-  // Toggle Pin status in DB
+  // Toggle Pin status
   const handleTogglePin = async (note: StudentNote) => {
-    if (!user) return
-    try {
-      const supabase = createClient()
-      const newPinned = !note.is_pinned
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase.from("student_notes") as any)
-        .update({ is_pinned: newPinned, updated_at: new Date().toISOString() })
-        .eq("id", note.id)
-        .eq("user_id", user.id)
+    const newPinned = !note.is_pinned
+    setNotes((prev) =>
+      prev.map((n) => (n.id === note.id ? { ...n, is_pinned: newPinned } : n))
+    )
 
-      setNotes((prev) =>
-        prev.map((n) => (n.id === note.id ? { ...n, is_pinned: newPinned } : n))
-      )
-    } catch (err) {
-      console.warn("Failed to pin note:", err)
+    if (user && !note.id.startsWith("starter-") && !note.id.startsWith("local-")) {
+      try {
+        const supabase = createClient()
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase.from("student_notes") as any)
+          .update({ is_pinned: newPinned, updated_at: new Date().toISOString() })
+          .eq("id", note.id)
+          .eq("user_id", user.id)
+      } catch (err) {
+        console.warn("Failed to pin note:", err)
+      }
     }
   }
 
-  // Delete note from DB
+  // Delete note
   const handleDeleteNote = async (noteId: string) => {
-    if (!user) return
-    try {
-      const supabase = createClient()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase.from("student_notes") as any)
-        .delete()
-        .eq("id", noteId)
-        .eq("user_id", user.id)
-      setNotes((prev) => prev.filter((n) => n.id !== noteId))
-    } catch (err) {
-      console.warn("Failed to delete note:", err)
+    setNotes((prev) => prev.filter((n) => n.id !== noteId))
+
+    if (user && !noteId.startsWith("starter-") && !noteId.startsWith("local-")) {
+      try {
+        const supabase = createClient()
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase.from("student_notes") as any)
+          .delete()
+          .eq("id", noteId)
+          .eq("user_id", user.id)
+      } catch (err) {
+        console.warn("Failed to delete note:", err)
+      }
     }
   }
 
@@ -384,28 +493,32 @@ export function StudentNotesWidget({ initialUser = null }: StudentNotesWidgetPro
 
           {/* Panel Content */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
-            {/* If NOT logged in */}
-            {!user ? (
-              <div className="p-6 text-center space-y-4 rounded-2xl border-2 border-dashed border-border bg-muted/20 my-auto">
-                <div className="size-12 rounded-2xl bg-amber-500/10 text-amber-500 mx-auto flex items-center justify-center">
-                  <Lock className="size-6" />
+            {/* Non-blocking sync banner if guest/unauthenticated */}
+            {!user && (
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between gap-3 text-start animate-in fade-in duration-200">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="size-8 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0">
+                    <Lock className="size-4" />
+                  </div>
+                  <div className="space-y-0.5 min-w-0">
+                    <h5 className="text-xs font-black text-foreground">
+                      وضع التدوين والمعاينة السريعة
+                    </h5>
+                    <p className="text-[11px] text-muted-foreground leading-snug">
+                      سجّل دخولك لحفظ ملاحظاتك ومزامنتها سحابياً عبر أجهزتك.
+                    </p>
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <h5 className="text-sm font-black text-foreground">
-                    سجّل دخولك لحفظ ملاحظاتك السحابية
-                  </h5>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    يتم تشفير وحفظ ملاحظاتك مباشرة على خوادم الكلية السحابية بحسابك، لتتمكن من الوصول إليها من أي جهاز ومن هاتفك المحمول بأمان تام دون أي تخزين محلي.
-                  </p>
-                </div>
-                <Link href="/login" onClick={() => setIsOpen(false)}>
-                  <Button className="w-full text-xs font-bold gap-2 cursor-pointer shadow-md">
-                    <span>تسجيل الدخول الآن</span>
-                    <ExternalLink className="size-3.5" />
+                <Link href="/login" onClick={() => setIsOpen(false)} className="shrink-0">
+                  <Button size="sm" variant="outline" className="text-[11px] font-bold border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 h-8 px-2.5 cursor-pointer">
+                    <span>تسجيل الدخول</span>
+                    <ExternalLink className="size-3" />
                   </Button>
                 </Link>
               </div>
-            ) : isEditing ? (
+            )}
+
+            {isEditing ? (
               /* ============================================================== */
               /* EDIT / CREATE FORM                                             */
               /* ============================================================== */
