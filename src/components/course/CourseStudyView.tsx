@@ -388,8 +388,8 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
             src={coverImg}
             alt={activeCourse.title}
             fill
-            unoptimized
             className="object-cover"
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 90vw, 1024px"
             priority
           />
           <div className="absolute inset-0 bg-gradient-to-t from-card via-card/30 to-black/25" />

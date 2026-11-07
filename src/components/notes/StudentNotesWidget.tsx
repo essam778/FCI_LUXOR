@@ -170,9 +170,10 @@ export function StudentNotesWidget({ initialUser = null }: StudentNotesWidgetPro
       const supabase = createClient()
       const { data, error } = await supabase
         .from("student_notes")
-        .select("*")
+        .select("id, user_id, title, content, course_code, color, is_pinned, created_at, updated_at")
         .order("is_pinned", { ascending: false })
         .order("updated_at", { ascending: false })
+        .order("id", { ascending: false })
 
       if (error) {
         console.warn("Could not fetch student_notes:", error.message)
@@ -370,8 +371,9 @@ export function StudentNotesWidget({ initialUser = null }: StudentNotesWidgetPro
     }
   }
 
-  // Toggle Pin status
+  // Toggle Pin status with automated rollback on failure (Optimistic UI)
   const handleTogglePin = async (note: StudentNote) => {
+    const previousNotes = [...notes]
     const newPinned = !note.is_pinned
     setNotes((prev) =>
       prev.map((n) => (n.id === note.id ? { ...n, is_pinned: newPinned } : n))
@@ -381,30 +383,37 @@ export function StudentNotesWidget({ initialUser = null }: StudentNotesWidgetPro
       try {
         const supabase = createClient()
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (supabase.from("student_notes") as any)
+        const { error } = await (supabase.from("student_notes") as any)
           .update({ is_pinned: newPinned, updated_at: new Date().toISOString() })
           .eq("id", note.id)
           .eq("user_id", user.id)
+
+        if (error) throw error
       } catch (err) {
-        console.warn("Failed to pin note:", err)
+        console.warn("Failed to pin note, rolling back optimistic update:", err)
+        setNotes(previousNotes)
       }
     }
   }
 
-  // Delete note
+  // Delete note with automated rollback on failure (Optimistic UI)
   const handleDeleteNote = async (noteId: string) => {
+    const previousNotes = [...notes]
     setNotes((prev) => prev.filter((n) => n.id !== noteId))
 
     if (user && !noteId.startsWith("starter-") && !noteId.startsWith("local-")) {
       try {
         const supabase = createClient()
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (supabase.from("student_notes") as any)
+        const { error } = await (supabase.from("student_notes") as any)
           .delete()
           .eq("id", noteId)
           .eq("user_id", user.id)
+
+        if (error) throw error
       } catch (err) {
-        console.warn("Failed to delete note:", err)
+        console.warn("Failed to delete note, rolling back optimistic update:", err)
+        setNotes(previousNotes)
       }
     }
   }

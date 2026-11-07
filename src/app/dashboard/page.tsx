@@ -21,29 +21,32 @@ export default async function DashboardPage() {
     redirect("/login?redirectTo=/dashboard")
   }
 
-  // Fetch profile
-  const { data } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single()
+  // Asynchronous Parallel Execution: Fetch profile and latest payment request concurrently
+  // Selective Data Fetching: Retrieve only the columns required by the dashboard
+  const [profileRes, paymentReqRes] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, level, display_name, university, role, avatar_url")
+      .eq("id", user.id)
+      .single(),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
+      .from("payment_requests")
+      .select("id, user_id, payment_method, sender_phone, reference_number, amount, status, admin_notes, created_at, reviewed_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ])
 
-  const profile = data as Profile | null
+  const profile = profileRes.data as Profile | null
   const currentLevel = profile?.level || 1
   const displayName = profile?.display_name || user.email?.split("@")[0] || "طالب"
   const university = profile?.university || ""
   // Strict role check: ONLY if profile.role === "admin" in database
   const isAdmin = profile?.role === "admin"
-
-  // Fetch user's latest payment request if unpaid
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: latestPaymentReq } = await (supabase as any)
-    .from("payment_requests")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  const latestPaymentReq = paymentReqRes.data
 
   return (
     <div className="w-full max-w-5xl mx-auto px-3 sm:px-6 py-6 sm:py-12 space-y-6 sm:space-y-8">

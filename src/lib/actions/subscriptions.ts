@@ -281,6 +281,7 @@ export async function getAdminPaymentRequestsAction(): Promise<{
         reviewed_at
       `)
       .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
 
     if (error) {
       return { success: false, error: error.message }

@@ -40,7 +40,15 @@ export async function generateMetadata({ params }: CoursePageProps): Promise<Met
 
 export default async function SingleCoursePage({ params }: CoursePageProps) {
   const { courseSlug } = await params
-  const course = await getCourseBySlug(courseSlug)
+
+  // Asynchronous Parallel Execution: Fetch course and auth user concurrently
+  const coursePromise = getCourseBySlug(courseSlug)
+  const authPromise = createClient().then(async (sb) => {
+    const { data } = await sb.auth.getUser()
+    return { supabase: sb, user: data.user }
+  })
+
+  const [course, { supabase, user }] = await Promise.all([coursePromise, authPromise])
 
   if (!course) {
     notFound()
@@ -48,12 +56,6 @@ export default async function SingleCoursePage({ params }: CoursePageProps) {
 
   // 1. Free Trial Course (e.g. Electronics ELEC105) is accessible for preview and trial
   const isFree = isFreeTrialCourse(course)
-
-  // 2. Authentication Check
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
 
   if (!user) {
     if (isFree) {

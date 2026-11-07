@@ -18,38 +18,49 @@ export default async function CoursesPage() {
   let userRole: string = "guest"
   let subscriptionStatus: string = "unpaid"
 
-  try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+  // Parallel asynchronous execution: Load courses and user session concurrently
+  const coursesPromise = getCoursesList()
 
-    if (user) {
-      const { data } = await supabase
-        .from("profiles")
-        .select("level, display_name, role, subscription_status")
-        .eq("id", user.id)
-        .single()
+  const authProfilePromise = (async () => {
+    try {
+      const supabase = await createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
-      const profile = data as {
-        level?: number | null
-        display_name?: string | null
-        role?: string | null
-        subscription_status?: string | null
-      } | null
+      if (user) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data } = await (supabase as any)
+          .from("profiles")
+          .select("level, display_name, role, subscription_status")
+          .eq("id", user.id)
+          .single()
 
-      if (profile?.level) {
-        userLevel = profile.level
+        const profile = data as {
+          level?: number | null
+          display_name?: string | null
+          role?: string | null
+          subscription_status?: string | null
+        } | null
+
+        return { user, profile }
       }
-      displayName = profile?.display_name || user.email?.split("@")[0] || null
-      userRole = profile?.role || "student"
-      subscriptionStatus = profile?.subscription_status || "unpaid"
+      return null
+    } catch {
+      return null
     }
-  } catch {
-    // If not authenticated, default to level 1 and guest
-  }
+  })()
 
-  const initialCourses = await getCoursesList()
+  const [initialCourses, authData] = await Promise.all([coursesPromise, authProfilePromise])
+
+  if (authData?.profile) {
+    if (authData.profile.level) {
+      userLevel = authData.profile.level
+    }
+    displayName = authData.profile.display_name || authData.user?.email?.split("@")[0] || null
+    userRole = authData.profile.role || "student"
+    subscriptionStatus = authData.profile.subscription_status || "unpaid"
+  }
 
   return (
     <div className="w-full max-w-6xl mx-auto px-3 sm:px-6 py-6 sm:py-12">

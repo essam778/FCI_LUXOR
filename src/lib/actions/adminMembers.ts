@@ -52,17 +52,25 @@ async function assertAdminCaller() {
 }
 
 /**
- * Fetch all platform members for the admin management panel.
+ * Fetch platform members with deterministic ordering and pagination support.
  */
-export async function getAdminMembers(): Promise<AdminMembersResult> {
+export async function getAdminMembers(page?: number, limit = 100): Promise<AdminMembersResult> {
   try {
     const { supabase } = await assertAdminCaller()
 
-    // Fetch all profiles
-    const { data, error } = await supabase
+    let query = supabase
       .from("profiles")
       .select("id, display_name, email, university, level, role, status, subscription_status, avatar_url, created_at")
       .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+
+    if (page && page > 0) {
+      const from = (page - 1) * limit
+      const to = from + limit - 1
+      query = query.range(from, to)
+    }
+
+    const { data, error } = await query
 
     if (error) {
       console.error("Failed to fetch admin members:", error.message)

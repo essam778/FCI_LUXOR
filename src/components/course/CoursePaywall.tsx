@@ -141,7 +141,7 @@ export function CoursePaywall({
       <div className="relative rounded-3xl border border-border/80 bg-card/85 backdrop-blur-xl overflow-hidden shadow-lg p-5 sm:p-7 flex flex-col md:flex-row items-center gap-6 justify-between">
         <div className="flex items-center gap-4 min-w-0">
           <div className="relative size-16 sm:size-20 rounded-2xl overflow-hidden shrink-0 border border-border shadow-sm">
-            <Image src={coverImg} alt={course.title} fill unoptimized className="object-cover" />
+            <Image src={coverImg} alt={course.title} fill className="object-cover" sizes="80px" />
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
               <Lock className="size-6 text-white" />
             </div>
