@@ -172,8 +172,19 @@ export async function deleteAdminMember(
     const { supabase } = await assertAdminCaller()
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const client: any = createAdminClient() || supabase
+    const adminClient: any = createAdminClient()
 
+    if (adminClient?.auth?.admin) {
+      // 1. Permanently delete from Supabase Auth (cascades to profile and kills active sessions)
+      const { error: authErr } = await adminClient.auth.admin.deleteUser(memberId)
+      if (authErr) {
+        console.warn("[deleteAdminMember] Auth delete failed, falling back to profile delete:", authErr.message)
+      }
+    }
+
+    // 2. Ensure profile row is removed
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client: any = adminClient || supabase
     const { error } = await client
       .from("profiles")
       .delete()

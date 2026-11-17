@@ -6,7 +6,7 @@ import { CourseStudyView } from "@/components/course/CourseStudyView"
 import { CoursePaywall } from "@/components/course/CoursePaywall"
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import type { PaymentRequestItem } from "@/lib/actions/subscriptions"
-import { isFreeTrialCourse } from "@/lib/subscriptionUtils"
+import { isFreeTrialCourse, maskCourseForTeaser } from "@/lib/subscriptionUtils"
 
 interface CoursePageProps {
   params: Promise<{
@@ -108,7 +108,7 @@ export default async function SingleCoursePage({ params }: CoursePageProps) {
     )
   }
 
-  // 6. Otherwise: Show Paywall & Activation Screen
+  // 6. Otherwise: Show Paywall & Activation Screen with sanitized teaser course data
   const { data: latestReq } = await client
     .from("payment_requests")
     .select("*")
@@ -117,9 +117,11 @@ export default async function SingleCoursePage({ params }: CoursePageProps) {
     .limit(1)
     .maybeSingle()
 
+  const safeTeaserCourse = maskCourseForTeaser(course)
+
   return (
     <CoursePaywall
-      course={course}
+      course={safeTeaserCourse}
       initialPendingRequest={latestReq as PaymentRequestItem | null}
     />
   )

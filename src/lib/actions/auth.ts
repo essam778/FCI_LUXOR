@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
-import { cookies, headers } from "next/headers"
+import { cookies } from "next/headers"
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { loginSchema, signupSchema, resetPasswordSchema, updatePasswordSchema } from "@/lib/validators/auth"
 
@@ -135,9 +135,8 @@ export async function requestPasswordReset(
     return { error: parsed.error.issues[0].message }
   }
 
-  const headerList = await headers()
-  const origin = headerList.get("origin") || headerList.get("host") || "https://study-plus-plus.vercel.app"
-  const formattedOrigin = origin.startsWith("http") ? origin : `https://${origin}`
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://study-plus-plus.vercel.app"
+  const formattedOrigin = siteUrl.startsWith("http") ? siteUrl.replace(/\/+$/, "") : `https://${siteUrl.replace(/\/+$/, "")}`
 
   const supabase = await createClient()
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {

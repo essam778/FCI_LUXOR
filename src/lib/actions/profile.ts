@@ -39,6 +39,25 @@ export async function updateProfile(
 
     const avatarData = (formData.get("avatarData") as string)?.trim()
 
+    // Validate avatarData payload size and schema to prevent DoS / Database Bloat
+    if (avatarData) {
+      const MAX_AVATAR_LENGTH = 2 * 1024 * 1024 // 2MB max
+      if (avatarData.length > MAX_AVATAR_LENGTH) {
+        return { error: "حجم الصورة الشخصية كبير جداً، الحد الأقصى المسموح به هو 2 ميجابايت." }
+      }
+
+      const isSafeImage =
+        avatarData.startsWith("data:image/jpeg;base64,") ||
+        avatarData.startsWith("data:image/png;base64,") ||
+        avatarData.startsWith("data:image/webp;base64,") ||
+        avatarData.startsWith("data:image/gif;base64,") ||
+        avatarData.startsWith("https://")
+
+      if (!isSafeImage) {
+        return { error: "صيغة الصورة غير مدعومة. يرجى اختيار ملف صورة صالح (JPEG, PNG, WEBP)." }
+      }
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const profilePayload: any = {
       display_name: displayName,

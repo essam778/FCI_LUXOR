@@ -1,4 +1,6 @@
-import { createClient } from "@/lib/supabase/client"
+"use server"
+
+import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { sanitizeInput, sanitizeUrl } from "@/lib/security"
 
 export interface CreateNotificationParams {
@@ -48,7 +50,10 @@ export async function dispatchRealNotification({
   }
 
   try {
-    const supabase = createClient()
+    const supabase = await createClient()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client: any = createAdminClient() || supabase
+
     const payload = {
       title: cleanTitle,
       message: cleanMessage,
@@ -60,8 +65,8 @@ export async function dispatchRealNotification({
       notification_type,
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from("notifications") as any)
+    const { data, error } = await client
+      .from("notifications")
       .insert(payload)
       .select()
       .single()
@@ -69,10 +74,6 @@ export async function dispatchRealNotification({
     if (error) {
       console.error("Failed to insert notification into Supabase:", error.message)
       return { success: false, error: error.message }
-    }
-
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new Event("fci_new_notification"))
     }
 
     return { success: true, data }
@@ -92,8 +93,11 @@ export async function fetchAdminNotificationLogs(): Promise<{
   error?: string
 }> {
   try {
-    const supabase = createClient()
-    const { data, error } = await supabase
+    const supabase = await createClient()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client: any = createAdminClient() || supabase
+
+    const { data, error } = await client
       .from("notifications")
       .select("*")
       .order("created_at", { ascending: false })
@@ -114,18 +118,17 @@ export async function fetchAdminNotificationLogs(): Promise<{
  */
 export async function deleteNotificationById(id: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const supabase = createClient()
-    const { error } = await supabase
+    const supabase = await createClient()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client: any = createAdminClient() || supabase
+
+    const { error } = await client
       .from("notifications")
       .delete()
       .eq("id", id)
 
     if (error) {
       return { success: false, error: error.message }
-    }
-
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new Event("fci_new_notification"))
     }
 
     return { success: true }

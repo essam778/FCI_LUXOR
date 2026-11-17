@@ -156,8 +156,21 @@ export async function submitPaymentRequestAction(
     // Upload receipt file if provided
     let screenshotUrl = ""
     if (receiptFile && receiptFile instanceof File && receiptFile.size > 0) {
-      const ext = receiptFile.name.split(".").pop() || "jpg"
-      const fileName = `receipt-${user.id}-${Date.now()}.${ext}`
+      // Validate file size: Max 5MB
+      const MAX_RECEIPT_SIZE = 5 * 1024 * 1024
+      if (receiptFile.size > MAX_RECEIPT_SIZE) {
+        return { success: false, error: "حجم صورة الإيصال كبير جداً. الحد الأقصى 5 ميجابايت." }
+      }
+
+      // Validate allowed mime types
+      const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]
+      if (receiptFile.type && !allowedTypes.includes(receiptFile.type.toLowerCase())) {
+        return { success: false, error: "نوع الملف غير مدعوم. يرجى إرفاق صورة (JPEG, PNG, WEBP)." }
+      }
+
+      const rawExt = receiptFile.name.split(".").pop()?.toLowerCase() || "jpg"
+      const safeExt = ["jpg", "jpeg", "png", "webp"].includes(rawExt) ? rawExt : "jpg"
+      const fileName = `receipt-${user.id}-${Date.now()}.${safeExt}`
 
       try {
         const uploadPromise = client.storage
@@ -175,10 +188,8 @@ export async function submitPaymentRequestAction(
         const raceResult: any = await Promise.race([uploadPromise, timeoutPromise])
 
         if (!raceResult?.error && raceResult?.data?.path) {
-          const {
-            data: { publicUrl },
-          } = client.storage.from("payment-receipts").getPublicUrl(raceResult.data.path)
-          screenshotUrl = publicUrl
+          // Store relative path for private signed URL generation
+          screenshotUrl = raceResult.data.path
         } else {
           console.warn("[submitPaymentRequest] Storage upload warning:", raceResult?.error?.message)
         }
@@ -312,15 +323,42 @@ export async function getAdminPaymentRequestsAction(): Promise<{
       }
     }
 
-    const mapped: PaymentRequestItem[] = rawRequests.map((r) => ({
-      ...r,
-      user: usersMap[r.user_id] || {
-        display_name: "مستخدم",
-        email: null,
-        level: null,
-        university: null,
-      },
-    }))
+    const mapped: PaymentRequestItem[] = await Promise.all(
+      rawRequests.map(async (r) => {
+        let displayScreenshot = r.screenshot_url
+        if (displayScreenshot) {
+          // If stored as path, or from payment-receipts bucket, generate private signed URL
+          const isFullUrl = displayScreenshot.startsWith("http://") || displayScreenshot.startsWith("https://")
+          const filePath = isFullUrl
+            ? displayScreenshot.split("/payment-receipts/").pop()
+            : displayScreenshot
+
+          if (filePath && !filePath.startsWith("http")) {
+            try {
+              const { data: signedData } = await client.storage
+                .from("payment-receipts")
+                .createSignedUrl(decodeURIComponent(filePath), 3600)
+              if (signedData?.signedUrl) {
+                displayScreenshot = signedData.signedUrl
+              }
+            } catch {
+              // fallback to original
+            }
+          }
+        }
+
+        return {
+          ...r,
+          screenshot_url: displayScreenshot,
+          user: usersMap[r.user_id] || {
+            display_name: "مستخدم",
+            email: null,
+            level: null,
+            university: null,
+          },
+        }
+      })
+    )
 
     return { success: true, requests: mapped }
   } catch (err) {

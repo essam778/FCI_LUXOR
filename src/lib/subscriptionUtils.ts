@@ -1,3 +1,5 @@
+import type { Course } from "@/data/coursesData"
+
 /**
  * Subscription & Course Access Utility Functions
  * Safe for use in both Server Components and Client Components
@@ -19,6 +21,38 @@ export function isFreeTrialCourse(course?: { slug?: string; code?: string; title
     title.includes("إلكترونيات") ||
     title.includes("الكترونيات")
   )
+}
+
+/**
+ * Mask and sanitize a course object for users who have not unlocked it.
+ * Strips all proprietary video links, lecture slides, mindmap images,
+ * and quizzes so they never leak in client components or RSC flight payloads.
+ */
+export function maskCourseForTeaser(course: Course): Course {
+  if (!course) return course
+  return {
+    ...course,
+    lectures: (course.lectures || []).map((lec) => ({
+      id: lec.id,
+      number: lec.number,
+      title: lec.title,
+      summary: "هذا المحتوى متاح للمشتركين فقط.",
+      videoUrl: undefined,
+      pdfUrl: undefined,
+      pdfName: undefined,
+      videos: [],
+      pdfs: [],
+      roadmaps: [],
+      quiz: [],
+      topics: (lec.topics || []).map((t) => ({
+        id: t.id,
+        slug: t.slug,
+        title: t.title,
+        summary: "",
+        importance: t.importance,
+      })),
+    })),
+  }
 }
 
 /**
