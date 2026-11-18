@@ -216,6 +216,7 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
       : "الفرقة الرابعة"
 
   const semText = activeCourse.semester === 1 ? "الترم الأول" : "الترم الثاني"
+  const semesterUrl = `/courses?semester=${activeCourse.semester || 1}`
 
   // Open/close state for lectures (All lectures start collapsed or clean, NO auto-open video)
   const [openLectures, setOpenLectures] = React.useState<Record<string, boolean>>({})
@@ -574,18 +575,20 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
             المقررات الدراسية
           </Link>
           <span>/</span>
-          <span className="text-muted-foreground">{semText}</span>
+          <Link href={semesterUrl} className="hover:text-foreground transition-colors font-semibold">
+            {semText}
+          </Link>
           <span>/</span>
           <span className="text-foreground font-bold truncate max-w-[150px] sm:max-w-none">{parsed.ar}</span>
         </nav>
 
-        {/* Colorful Exit to All Courses Button requested by the user */}
+        {/* Colorful Exit to Semester Courses Button requested by the user */}
         <Link
-          href="/courses"
+          href={semesterUrl}
           className="group relative inline-flex items-center gap-2 self-start sm:self-auto px-4 py-2 sm:px-5 sm:py-2.5 rounded-2xl text-xs sm:text-sm font-black text-white shadow-lg overflow-hidden transition-all duration-300 hover:scale-[1.03] active:scale-95 cursor-pointer bg-gradient-to-r from-violet-600 via-fuchsia-600 to-pink-500 hover:from-violet-500 hover:via-fuchsia-500 hover:to-pink-400 shadow-fuchsia-500/25"
         >
           <ArrowRight className="size-4 stroke-[2.5] rtl:rotate-0 rotate-180 group-hover:-translate-x-1 transition-transform" />
-          <span>الخروج وتصفح جميع المواد</span>
+          <span>العودة لمواد {semText}</span>
           <span className="size-2 rounded-full bg-white/90 animate-ping ms-1" />
         </Link>
       </div>
@@ -608,10 +611,10 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
           </div>
 
           <Link
-            href="/courses"
+            href={semesterUrl}
             className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs transition-colors shadow-sm"
           >
-            <span>استعراض باقي المواد</span>
+            <span>استعراض باقي مواد {semText}</span>
           </Link>
         </div>
       )}
@@ -1618,24 +1621,32 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
         )}
       </div>
 
-      {/* Bottom Exit Banner: Prominent colorful button to exit to all courses */}
+      {/* Bottom Exit Banner: Prominent colorful button to exit to semester courses */}
       <div className="p-6 sm:p-8 rounded-3xl border border-border/80 bg-card/85 backdrop-blur-xl flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-start shadow-md">
         <div className="space-y-1">
           <h4 className="text-base sm:text-lg font-black text-foreground">
             هل ترغب في دراسة مقرر دراسي آخر؟
           </h4>
           <p className="text-xs sm:text-sm text-muted-foreground">
-            يمكنك العودة إلى قائمة المقررات الكاملة واستعراض أي مادة بدون التقيد بفصل دراسي معين.
+            يمكنك العودة إلى قائمة مواد {semText} أو تصفح كافة الفصول والمقررات.
           </p>
         </div>
 
-        <Link
-          href="/courses"
-          className="group inline-flex items-center gap-2.5 px-6 py-3 rounded-2xl text-xs sm:text-sm font-black text-white shadow-lg transition-all duration-300 hover:shadow-2xl hover:scale-105 active:scale-95 cursor-pointer bg-gradient-to-r from-violet-600 via-fuchsia-600 to-pink-500 hover:from-violet-500 hover:via-fuchsia-500 hover:to-pink-400 shrink-0"
-        >
-          <ArrowRight className="size-4.5 stroke-[2.5] rtl:rotate-0 rotate-180 group-hover:-translate-x-1.5 transition-transform" />
-          <span>الخروج لجميع المقررات الدراسية</span>
-        </Link>
+        <div className="flex items-center gap-2.5 flex-wrap justify-center sm:justify-start">
+          <Link
+            href={semesterUrl}
+            className="group inline-flex items-center gap-2.5 px-6 py-3 rounded-2xl text-xs sm:text-sm font-black text-white shadow-lg transition-all duration-300 hover:shadow-2xl hover:scale-105 active:scale-95 cursor-pointer bg-gradient-to-r from-violet-600 via-fuchsia-600 to-pink-500 hover:from-violet-500 hover:via-fuchsia-500 hover:to-pink-400 shrink-0"
+          >
+            <ArrowRight className="size-4.5 stroke-[2.5] rtl:rotate-0 rotate-180 group-hover:-translate-x-1.5 transition-transform" />
+            <span>العودة لمواد {semText}</span>
+          </Link>
+          <Link
+            href="/courses"
+            className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl text-xs sm:text-sm font-bold bg-muted hover:bg-muted/80 text-foreground border border-border transition-colors cursor-pointer"
+          >
+            <span>اختيار فصل دراسي آخر</span>
+          </Link>
+        </div>
       </div>
 
       {/* 4. Roadmap Modal */}

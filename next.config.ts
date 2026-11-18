@@ -29,6 +29,30 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "10mb",
     },
   },
+  async redirects() {
+    return [
+      {
+        source: "/courses/semester-1",
+        destination: "/courses?semester=1",
+        permanent: false,
+      },
+      {
+        source: "/courses/semester-2",
+        destination: "/courses?semester=2",
+        permanent: false,
+      },
+      {
+        source: "/courses/term-1",
+        destination: "/courses?semester=1",
+        permanent: false,
+      },
+      {
+        source: "/courses/term-2",
+        destination: "/courses?semester=2",
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     return [
       {

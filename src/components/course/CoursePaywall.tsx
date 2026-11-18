@@ -132,6 +132,13 @@ export function CoursePaywall({
           المقررات الدراسية
         </Link>
         <span>/</span>
+        <Link
+          href={`/courses?semester=${course.semester || 1}`}
+          className="hover:text-foreground transition-colors font-semibold"
+        >
+          {course.semester === 2 ? "الترم الثاني" : "الترم الأول"}
+        </Link>
+        <span>/</span>
         <span className="text-foreground font-bold">{course.title}</span>
         <span>/</span>
         <span className="text-primary font-bold">تفعيل الاشتراك</span>

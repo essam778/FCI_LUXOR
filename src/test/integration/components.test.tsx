@@ -107,11 +107,11 @@ describe("UI Components (Integration Tests)", () => {
       expect(screen.getByText("ELEC101")).toBeInTheDocument()
     })
 
-    it("should display the colorful exit button linking to /courses", () => {
+    it("should display the colorful exit button linking to semester courses", () => {
       render(<CourseStudyView course={mockCourse} isFreeTrial={true} />)
-      const exitButton = screen.getByRole("link", { name: /الخروج وتصفح جميع المواد/i })
-      expect(exitButton).toBeInTheDocument()
-      expect(exitButton).toHaveAttribute("href", "/courses")
+      const exitButtons = screen.getAllByRole("link", { name: /العودة لمواد الترم الأول/i })
+      expect(exitButtons.length).toBeGreaterThan(0)
+      expect(exitButtons[0]).toHaveAttribute("href", "/courses?semester=1")
     })
 
     it("should render lecture item and allow expanding content", async () => {

@@ -60,12 +60,16 @@ export function CoursesExplorer({
   const selectedYear = userLevel && userLevel >= 1 && userLevel <= 4 ? userLevel : 1
   const [searchQuery, setSearchQuery] = React.useState<string>("")
 
-  // Navigation View: "semesters_boxes" (showing Sem 1 & Sem 2 boxes) or "semester_details" (inside a semester)
-  const [currentView, setCurrentView] = React.useState<"semesters_boxes" | "semester_details">("semesters_boxes")
-  const [activeSemester, setActiveSemester] = React.useState<1 | 2>(1)
-
   const router = useRouter()
   const searchParams = useSearchParams()
+
+  const semParam = searchParams.get("semester")
+  const initialSemester: 1 | 2 = semParam === "2" ? 2 : 1
+  const initialView = semParam === "1" || semParam === "2" ? "semester_details" : "semesters_boxes"
+
+  // Navigation View: "semesters_boxes" (showing Sem 1 & Sem 2 boxes) or "semester_details" (inside a semester)
+  const [currentView, setCurrentView] = React.useState<"semesters_boxes" | "semester_details">(initialView)
+  const [activeSemester, setActiveSemester] = React.useState<1 | 2>(initialSemester)
 
   // Courses list strictly from database props
   const [allCourses, setAllCourses] = React.useState<Course[]>(initialCourses || [])
@@ -85,12 +89,14 @@ export function CoursesExplorer({
     }
   }, [searchParams, allCourses, router])
 
-  // Sync with ?semester=1 or ?semester=2
+  // Sync with ?semester=1 or ?semester=2 and browser back/forward buttons
   React.useEffect(() => {
-    const semParam = searchParams.get("semester")
-    if (semParam === "1" || semParam === "2") {
-      setActiveSemester(Number(semParam) as 1 | 2)
+    const currentSem = searchParams.get("semester")
+    if (currentSem === "1" || currentSem === "2") {
+      setActiveSemester(Number(currentSem) as 1 | 2)
       setCurrentView("semester_details")
+    } else {
+      setCurrentView("semesters_boxes")
     }
   }, [searchParams])
 
@@ -396,12 +402,9 @@ export function CoursesExplorer({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* Box 1: Semester 1 */}
-            <div
-              onClick={() => {
-                setActiveSemester(1)
-                setCurrentView("semester_details")
-              }}
-              className="group rounded-3xl border border-border/80 bg-card/80 backdrop-blur-md p-6 sm:p-7 shadow-sm hover:border-primary/50 hover:shadow-xl transition-all cursor-pointer text-start space-y-4 relative overflow-hidden"
+            <Link
+              href="/courses?semester=1"
+              className="group rounded-3xl border border-border/80 bg-card/80 backdrop-blur-md p-6 sm:p-7 shadow-sm hover:border-primary/50 hover:shadow-xl transition-all cursor-pointer text-start space-y-4 relative overflow-hidden block"
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono font-bold text-muted-foreground">
@@ -444,15 +447,12 @@ export function CoursesExplorer({
                 <span>{term1Courses.length > 0 ? "دخول مواد الترم الأول" : "استعراض الفصل"}</span>
                 <ArrowRight className="size-4 rtl:rotate-0 rotate-180 group-hover:-translate-x-1 transition-transform" />
               </div>
-            </div>
+            </Link>
 
             {/* Box 2: Semester 2 */}
-            <div
-              onClick={() => {
-                setActiveSemester(2)
-                setCurrentView("semester_details")
-              }}
-              className="group rounded-3xl border border-border/80 bg-card/80 backdrop-blur-md p-6 sm:p-7 shadow-sm hover:border-primary/50 hover:shadow-xl transition-all cursor-pointer text-start space-y-4 relative overflow-hidden"
+            <Link
+              href="/courses?semester=2"
+              className="group rounded-3xl border border-border/80 bg-card/80 backdrop-blur-md p-6 sm:p-7 shadow-sm hover:border-primary/50 hover:shadow-xl transition-all cursor-pointer text-start space-y-4 relative overflow-hidden block"
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono font-bold text-muted-foreground">
@@ -495,28 +495,26 @@ export function CoursesExplorer({
                 <span>{term2Courses.length > 0 ? "دخول مواد الترم الثاني" : "استعراض الفصل"}</span>
                 <ArrowRight className="size-4 rtl:rotate-0 rotate-180 group-hover:-translate-x-1 transition-transform" />
               </div>
-            </div>
+            </Link>
           </div>
         </div>
       ) : (
         /* VIEW 3: INSIDE SEMESTER VIEW (Cards linking directly to course pages) */
         <div className="space-y-6">
-          {/* Top Switcher & Back Navigation (Issue 5 Fix) */}
+          {/* Top Switcher & Back Navigation */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border/60">
-            <button
-              type="button"
-              onClick={() => setCurrentView("semesters_boxes")}
+            <Link
+              href="/courses"
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-muted hover:bg-muted/80 text-foreground border border-border/80 transition-all cursor-pointer w-fit"
             >
               <ArrowRight className="size-4 rtl:rotate-0 rotate-180" />
               <span>العودة لاختيار الفصل الدراسي</span>
-            </button>
+            </Link>
 
             {/* Direct Semester Switcher Tabs */}
             <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-muted/60 border border-border/60">
-              <button
-                type="button"
-                onClick={() => setActiveSemester(1)}
+              <Link
+                href="/courses?semester=1"
                 className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
                   activeSemester === 1
                     ? "bg-primary text-primary-foreground shadow-md"
@@ -524,10 +522,9 @@ export function CoursesExplorer({
                 }`}
               >
                 الفصل الدراسي الأول ({term1Courses.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveSemester(2)}
+              </Link>
+              <Link
+                href="/courses?semester=2"
                 className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
                   activeSemester === 2
                     ? "bg-primary text-primary-foreground shadow-md"
@@ -535,7 +532,7 @@ export function CoursesExplorer({
                 }`}
               >
                 الفصل الدراسي الثاني ({term2Courses.length})
-              </button>
+              </Link>
             </div>
           </div>
 
