@@ -3,13 +3,17 @@ import { NextResponse, type NextRequest } from 'next/server'
 import type { Database } from '@/types/database'
 
 export async function updateSession(request: NextRequest) {
-  // If request contains an OAuth code but arrived at a page other than /auth/callback
+  // If request contains an OAuth code or recovery code but arrived at a page other than /auth/callback
   // (e.g. Supabase default Site URL fallback to '/'), forward it to /auth/callback immediately:
   if (
     request.nextUrl.searchParams.has('code') &&
     !request.nextUrl.pathname.startsWith('/auth/callback')
   ) {
     const callbackUrl = request.nextUrl.clone()
+    // Preserve the original destination as `next` if not already set
+    if (!callbackUrl.searchParams.has('next') && request.nextUrl.pathname !== '/') {
+      callbackUrl.searchParams.set('next', request.nextUrl.pathname)
+    }
     callbackUrl.pathname = '/auth/callback'
     return NextResponse.redirect(callbackUrl)
   }

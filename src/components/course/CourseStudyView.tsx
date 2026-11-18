@@ -27,9 +27,52 @@ import {
   ArrowRight,
   ArrowLeft,
   Check,
+  Clock,
+  Target,
+  AlertCircle,
+  Sparkles,
+  Flame,
+  CheckSquare,
+  Square,
+  TrendingUp,
+  FileQuestion,
+  GraduationCap,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Course, LectureChapter, VideoItem, PdfItem, RoadmapItem, QuizQuestion } from "@/data/coursesData"
+import {
+  formatDuration,
+  formatStopwatch,
+  getCourseMistakes,
+  seedMistakesCache,
+  recordQuizMistakes,
+  clearResolvedMistake,
+  clearAllCourseMistakes,
+  logQuizAttempt,
+  getCourseQuizHistory,
+  seedQuizHistoryCache,
+  getCourseProgress,
+  seedProgressCache,
+  addStudyTime,
+  toggleLectureCompletion,
+  markQuizPassed,
+  calculateMastery,
+  type MistakeQuestionItem,
+  type CourseProgressRecord,
+} from "@/lib/quizTracker"
+import {
+  fetchCourseProgress,
+  upsertCourseProgress,
+  addStudyTimeToDb,
+  toggleLectureCompletionInDb,
+  markQuizPassedInDb,
+  fetchCourseMistakesFromDb,
+  upsertMistakesToDb,
+  removeMistakesFromDb,
+  clearAllCourseMistakesInDb,
+  logQuizAttemptToDb,
+  fetchCourseQuizAttemptsFromDb,
+} from "@/lib/actions/analytics"
 
 interface CourseStudyViewProps {
   course: Course
@@ -225,7 +268,10 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
     }
   }, [targetLectureParam, activeCourse.lectures])
 
-  const toggleSection = (lectureId: string, section: "video" | "pdf" | "notes" | "topics" | "roadmap" | "quiz") => {
+  const toggleSection = (
+    lectureId: string,
+    section: "video" | "pdf" | "notes" | "topics" | "roadmap" | "quiz" | "subchapters"
+  ) => {
     setOpenSections((prev) => {
       const current = prev[lectureId] || {}
       // Default is false (closed) for all sections — user must explicitly open
@@ -244,7 +290,6 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
     if (openSections[lectureId]?.[section] !== undefined) {
       return openSections[lectureId][section]
     }
-    // No section auto-opens — user must click to expand
     return false
   }
 
@@ -258,6 +303,60 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
   const [quizAnswers, setQuizAnswers] = React.useState<Record<string, Record<string | number, number>>>({})
   const [quizSubmitted, setQuizSubmitted] = React.useState<Record<string, boolean>>({})
 
+  // Learning Progress & Mistake Bank State – seeded from Supabase on mount
+  const [courseProgress, setCourseProgress] = React.useState<CourseProgressRecord>(() =>
+    getCourseProgress(activeCourse.id)
+  )
+  const [mistakesList, setMistakesList] = React.useState<MistakeQuestionItem[]>(() =>
+    getCourseMistakes(activeCourse.id)
+  )
+  const [isMistakeBankOpen, setIsMistakeBankOpen] = React.useState(false)
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = React.useState(true)
+
+  // On mount: load analytics from Supabase and seed local caches
+  React.useEffect(() => {
+    setIsLoadingAnalytics(true)
+    Promise.all([
+      fetchCourseProgress(activeCourse.id),
+      fetchCourseMistakesFromDb(activeCourse.id),
+      fetchCourseQuizAttemptsFromDb(activeCourse.id, 50),
+    ]).then(([dbProgress, dbMistakes, dbAttempts]) => {
+      if (dbProgress) {
+        seedProgressCache(dbProgress)
+        setCourseProgress(dbProgress)
+      }
+      if (dbMistakes) {
+        seedMistakesCache(activeCourse.id, dbMistakes)
+        setMistakesList(dbMistakes)
+      }
+      if (dbAttempts) {
+        seedQuizHistoryCache(dbAttempts)
+      }
+      setIsLoadingAnalytics(false)
+    }).catch(() => setIsLoadingAnalytics(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCourse.id])
+
+  // Active Study Time Heartbeat (increments study time every 30s while tab is visible)
+  // Supabase write happens every 60s to avoid too many round-trips
+  const dbSyncAccumRef = React.useRef(0)
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        addStudyTime(activeCourse.id, 5)
+        setCourseProgress(getCourseProgress(activeCourse.id))
+        dbSyncAccumRef.current += 5
+        // Sync to DB every 60 seconds (12 ticks × 5s)
+        if (dbSyncAccumRef.current >= 60) {
+          dbSyncAccumRef.current = 0
+          addStudyTimeToDb(activeCourse.id, 60).catch(() => {/* silent */})
+        }
+      }
+    }, 5000)
+
+    return () => clearInterval(timer)
+  }, [activeCourse.id])
+
   // Active Dedicated Standalone Quiz Assessment Modal
   const [activeQuizSession, setActiveQuizSession] = React.useState<{
     lectureId: string
@@ -265,15 +364,51 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
     questions: QuizQuestion[]
     currentIndex: number
     isGraded: boolean
+    startTime: number
+    elapsedSeconds: number
+    isMockExam?: boolean
+    isMistakePractice?: boolean
+    timeLimitSeconds?: number
   } | null>(null)
 
-  const handleStartQuizSession = (lecture: LectureChapter, questions: QuizQuestion[]) => {
+  // Live Stopwatch for Active Quiz Session
+  React.useEffect(() => {
+    if (!activeQuizSession || activeQuizSession.isGraded) return
+
+    const interval = setInterval(() => {
+      setActiveQuizSession((prev) => {
+        if (!prev || prev.isGraded) return prev
+        const nextSeconds = prev.elapsedSeconds + 1
+
+        // Auto submit if time limit reached in mock exam
+        if (prev.timeLimitSeconds && nextSeconds >= prev.timeLimitSeconds) {
+          handleGradeQuizSession(prev.lectureId, prev.questions)
+          return { ...prev, elapsedSeconds: nextSeconds, isGraded: true }
+        }
+
+        return { ...prev, elapsedSeconds: nextSeconds }
+      })
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [activeQuizSession?.isGraded, activeQuizSession?.questions])
+
+  const handleStartQuizSession = (
+    lecture: { id: string; title: string },
+    questions: QuizQuestion[],
+    options?: { isMockExam?: boolean; isMistakePractice?: boolean; timeLimitSeconds?: number }
+  ) => {
     setActiveQuizSession({
       lectureId: lecture.id,
       lectureTitle: lecture.title,
       questions,
       currentIndex: 0,
       isGraded: false,
+      startTime: Date.now(),
+      elapsedSeconds: 0,
+      isMockExam: options?.isMockExam,
+      isMistakePractice: options?.isMistakePractice,
+      timeLimitSeconds: options?.timeLimitSeconds,
     })
   }
 
@@ -284,7 +419,129 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
       questions,
       currentIndex: 0,
       isGraded: true,
+      startTime: Date.now(),
+      elapsedSeconds: 0,
     })
+  }
+
+  const handleGradeQuizSession = (lectureId: string, questions: QuizQuestion[]) => {
+    const currentAnswers = quizAnswers[lectureId] || {}
+    const total = questions.length
+    const correct = questions.filter((q) => currentAnswers[q.id] === q.correctIndex).length
+    const pct = total > 0 ? Math.round((correct / total) * 100) : 0
+    const duration = activeQuizSession?.elapsedSeconds || 0
+    const lectureTitle = activeQuizSession?.lectureTitle || "كويز المحاضرة"
+    const attemptId = `attempt-${Date.now()}`
+
+    // 1. Record quiz attempt locally + sync to Supabase
+    const attemptRecord = {
+      id: attemptId,
+      courseId: activeCourse.id,
+      lectureId,
+      lectureTitle,
+      score: pct,
+      totalQuestions: total,
+      correctCount: correct,
+      durationSeconds: duration,
+      timestamp: Date.now(),
+      isMockExam: activeQuizSession?.isMockExam,
+    }
+    logQuizAttempt(attemptRecord)
+    logQuizAttemptToDb(attemptRecord).catch(() => {/* silent */})
+
+    // 2. Record mistakes locally + sync new mistakes to Supabase, remove resolved ones
+    const { newMistakes, resolvedIds } = recordQuizMistakes(
+      activeCourse.id,
+      lectureId,
+      lectureTitle,
+      questions,
+      currentAnswers
+    )
+    setMistakesList(getCourseMistakes(activeCourse.id))
+
+    if (newMistakes.length > 0) {
+      upsertMistakesToDb(
+        activeCourse.id,
+        lectureId,
+        lectureTitle,
+        newMistakes.map((m) => ({
+          questionId: m.questionId,
+          questionText: m.questionText,
+          options: m.options,
+          correctIndex: m.correctIndex,
+          userSelectedIndex: m.userSelectedIndex,
+          explanation: m.explanation,
+        }))
+      ).catch(() => {/* silent */})
+    }
+    if (resolvedIds.length > 0) {
+      removeMistakesFromDb(activeCourse.id, resolvedIds).catch(() => {/* silent */})
+    }
+
+    // 3. Mark quiz passed if >= 60% + sync to Supabase
+    if (pct >= 60) {
+      markQuizPassed(activeCourse.id, lectureId)
+      setCourseProgress(getCourseProgress(activeCourse.id))
+      markQuizPassedInDb(activeCourse.id, lectureId).catch(() => {/* silent */})
+    }
+
+    setQuizSubmitted((prev) => ({ ...prev, [lectureId]: true }))
+    setActiveQuizSession((prev) => (prev ? { ...prev, isGraded: true } : null))
+  }
+
+  // Course-Wide Mock Exam Generator
+  const handleStartCourseMockExam = () => {
+    const allQuestions: QuizQuestion[] = []
+    activeCourse.lectures.forEach((lec) => {
+      const qList = getLectureQuizQuestions(lec)
+      qList.forEach((q) => {
+        allQuestions.push({
+          ...q,
+          question: `[${lec.title}] ${q.question}`,
+        })
+      })
+    })
+
+    if (allQuestions.length === 0) {
+      alert("لا توجد أسئلة كافية في هذا المقرر لإنشاء امتحان مجمع حالياً.")
+      return
+    }
+
+    // Shuffle and pick up to 25 questions
+    const shuffled = [...allQuestions].sort(() => Math.random() - 0.5).slice(0, 25)
+
+    handleStartQuizSession(
+      { id: "mock-exam", title: `الامتحان المجمع الشامل: ${activeCourse.title}` },
+      shuffled,
+      { isMockExam: true, timeLimitSeconds: Math.min(30 * 60, shuffled.length * 90) }
+    )
+  }
+
+  // Practice Mistake Questions Only
+  const handlePracticeMistakes = () => {
+    if (mistakesList.length === 0) return
+    const questions: QuizQuestion[] = mistakesList.map((m) => ({
+      id: m.questionId,
+      question: `[${m.lectureTitle}] ${m.questionText}`,
+      options: m.options,
+      correctIndex: m.correctIndex,
+      explanation: m.explanation,
+    }))
+
+    setIsMistakeBankOpen(false)
+    handleStartQuizSession(
+      { id: "mistake-practice", title: "مراجعة وحل الأسئلة التي أخطأت فيها" },
+      questions,
+      { isMistakePractice: true }
+    )
+  }
+
+  const handleToggleLectureComplete = (lectureId: string) => {
+    // Optimistic local update
+    toggleLectureCompletion(activeCourse.id, lectureId)
+    setCourseProgress(getCourseProgress(activeCourse.id))
+    // Persist to Supabase
+    toggleLectureCompletionInDb(activeCourse.id, lectureId).catch(() => {/* silent */})
   }
 
   const toggleLecture = (lectureId: string) => {
@@ -311,6 +568,9 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
 
   const handleSubmitQuiz = (lectureId: string) => {
     setQuizSubmitted((prev) => ({ ...prev, [lectureId]: true }))
+    if (activeQuizSession) {
+      handleGradeQuizSession(activeQuizSession.lectureId, activeQuizSession.questions)
+    }
   }
 
   // Summary counts
@@ -469,6 +729,118 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
         </div>
       </div>
 
+      {/* 2.5. Real-Time Student Learning Analytics & Mastery Dashboard */}
+      {(() => {
+        const completedCount = courseProgress.completedLectureIds.length
+        const totalCount = Math.max(1, totalLecs)
+        const progressPct = Math.round((completedCount / totalCount) * 100)
+        const historyScores = getCourseQuizHistory(activeCourse.id).map((a) => a.score)
+        const mastery = calculateMastery(courseProgress, totalLecs, historyScores)
+
+        return (
+          <div className="rounded-2xl sm:rounded-3xl border border-border/80 bg-card/90 backdrop-blur-xl p-4 sm:p-6 shadow-lg space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-border/60">
+              <div className="space-y-1 text-start">
+                <div className="flex items-center gap-2">
+                  <Flame className="size-5 text-amber-500 animate-pulse" />
+                  <h3 className="text-sm sm:text-base font-black text-foreground">
+                    مؤشرات التعلم ومستوى الإتقان
+                  </h3>
+                  <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border ${mastery.colorClass}`}>
+                    {mastery.tierBadge}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">{mastery.description}</p>
+              </div>
+
+              {/* Action Buttons: Mock Exam & Mistake Bank */}
+              <div className="flex items-center gap-2 flex-wrap self-stretch sm:self-auto">
+                <Button
+                  size="sm"
+                  onClick={handleStartCourseMockExam}
+                  className="h-9 px-3.5 rounded-xl font-bold text-xs bg-gradient-to-r from-primary to-indigo-600 text-white shadow-sm hover:brightness-110 gap-1.5 cursor-pointer"
+                >
+                  <Target className="size-3.5" />
+                  <span>امتحان مجمع على المادة</span>
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsMistakeBankOpen(true)}
+                  className={`h-9 px-3 rounded-xl font-bold text-xs gap-1.5 cursor-pointer border ${
+                    mistakesList.length > 0
+                      ? "border-rose-500/40 text-rose-500 hover:bg-rose-500/10"
+                      : "border-border text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  <AlertCircle className="size-3.5" />
+                  <span>بنك مراجعة أخطائي</span>
+                  {mistakesList.length > 0 && (
+                    <span className="size-4.5 rounded-full bg-rose-500 text-white text-[10px] font-mono font-black flex items-center justify-center">
+                      {mistakesList.length}
+                    </span>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Metrics Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Metric 1: Completion Progress */}
+              <div className="p-3.5 rounded-2xl border border-border/60 bg-muted/20 space-y-2 text-start">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground font-bold flex items-center gap-1.5">
+                    <CheckSquare className="size-3.5 text-emerald-500" />
+                    <span>نسبة إنجاز المنهج:</span>
+                  </span>
+                  <strong className="font-mono text-foreground font-black">{progressPct}%</strong>
+                </div>
+                <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-primary to-emerald-400 rounded-full transition-all duration-500"
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
+                <div className="text-[10px] text-muted-foreground font-mono">
+                  {completedCount} من {totalLecs} محاضرات مكتملة
+                </div>
+              </div>
+
+              {/* Metric 2: Active Study Time */}
+              <div className="p-3.5 rounded-2xl border border-border/60 bg-muted/20 space-y-1 text-start">
+                <span className="text-muted-foreground font-bold text-xs flex items-center gap-1.5">
+                  <span className="relative flex size-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full size-2 bg-emerald-500" />
+                  </span>
+                  <span>وقت المذاكرة الفعلي:</span>
+                </span>
+                <div className="text-base sm:text-lg font-mono font-black text-foreground pt-1">
+                  {formatDuration(courseProgress.totalStudySeconds || 0)}
+                </div>
+                <p className="text-[10px] text-muted-foreground">يتم احتساب الوقت أثناء وجودك داخل المادة</p>
+              </div>
+
+              {/* Metric 3: Mastery Score */}
+              <div className="p-3.5 rounded-2xl border border-border/60 bg-muted/20 space-y-1 text-start">
+                <span className="text-muted-foreground font-bold text-xs flex items-center gap-1.5">
+                  <TrendingUp className="size-3.5 text-primary" />
+                  <span>مستوى الاستيعاب الأكاديمي:</span>
+                </span>
+                <div className="flex items-baseline gap-2 pt-1">
+                  <span className="text-xl sm:text-2xl font-mono font-black text-primary">
+                    {mastery.percentage}%
+                  </span>
+                  <span className="text-xs font-bold text-muted-foreground">{mastery.tierName}</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground">محسوب بناءً على الكويزات والانتظام</p>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* 3. Lectures List (Clean, Structured, NOT Dumped Open) */}
       <div className="space-y-3 sm:space-y-4">
         <div className="flex items-center justify-between pb-1">
@@ -551,7 +923,38 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
                       </div>
                     </div>
 
-                    <div className="shrink-0 flex items-center">
+                    <div className="shrink-0 flex items-center gap-2">
+                      {/* Checkmark Completion Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleToggleLectureComplete(lecture.id)
+                        }}
+                        className={`px-2.5 py-1 rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                          courseProgress.completedLectureIds.includes(lecture.id)
+                            ? "bg-emerald-500 text-white shadow-xs"
+                            : "bg-white/15 text-white/90 hover:bg-white/25"
+                        }`}
+                        title={
+                          courseProgress.completedLectureIds.includes(lecture.id)
+                            ? "محاضرة مكتملة"
+                            : "تحديد المحاضرة كمكتملة"
+                        }
+                      >
+                        {courseProgress.completedLectureIds.includes(lecture.id) ? (
+                          <>
+                            <Check className="size-3.5 stroke-[3]" />
+                            <span className="hidden sm:inline">مكتملة</span>
+                          </>
+                        ) : (
+                          <>
+                            <Square className="size-3.5" />
+                            <span className="hidden sm:inline">إتمام</span>
+                          </>
+                        )}
+                      </button>
+
                       <div
                         className={`size-9 sm:size-10 rounded-full bg-white/25 text-white flex items-center justify-center transition-transform duration-200 ${
                           isOpen ? "rotate-180 bg-white/35" : ""
@@ -565,6 +968,112 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
                   {/* Lecture Content (Sub-sections: NOT open all together!) */}
                   {isOpen && (
                     <div className="p-3 sm:p-4 space-y-3 bg-[#060b14]/95 border-t border-slate-800/80 animate-in slide-in-from-top-1 duration-150">
+                      {/* Sub-item 0: شباتر ووحدات المحاضرة الفرعية */}
+                      {lecture.subChapters && lecture.subChapters.length > 0 && (
+                        <div className="space-y-2">
+                          <div
+                            onClick={() => toggleSection(lecture.id, "subchapters")}
+                            className="bg-[#0b1428] hover:bg-[#101b38] border border-sky-500/50 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 cursor-pointer select-none transition-colors"
+                          >
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <Layers className="size-4 text-sky-400 shrink-0" />
+                              <span className="text-xs sm:text-sm font-bold text-sky-400 truncate">
+                                شباتر وأقسام المحاضرة ({lecture.subChapters.length})
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-sky-400 shrink-0">
+                              <span>{isSectionOpen(lecture.id, "subchapters") ? "إخفاء" : "عرض"}</span>
+                              <ChevronDown
+                                className={`size-4 transition-transform duration-200 ${
+                                  isSectionOpen(lecture.id, "subchapters") ? "rotate-180" : ""
+                                }`}
+                              />
+                            </div>
+                          </div>
+
+                          {isSectionOpen(lecture.id, "subchapters") && (
+                            <div className="space-y-3 pt-1 animate-in fade-in-50 duration-150">
+                              {lecture.subChapters.map((sub, sIdx) => {
+                                return (
+                                  <div
+                                    key={sub.id || sIdx}
+                                    className="p-3.5 sm:p-4 rounded-xl border border-border/80 bg-card/70 space-y-2.5 text-start"
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="space-y-0.5 min-w-0 flex-1">
+                                        <div className="flex items-center gap-2">
+                                          <span className="size-5 rounded-md bg-sky-500/20 text-sky-400 text-[10px] font-black flex items-center justify-center shrink-0">
+                                            {sub.order || sIdx + 1}
+                                          </span>
+                                          <h4 className="text-xs sm:text-sm font-bold text-foreground truncate">
+                                            {sub.title}
+                                          </h4>
+                                        </div>
+                                        {sub.summary && (
+                                          <p className="text-[11px] text-muted-foreground leading-relaxed pt-0.5">
+                                            {sub.summary}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Sub-Chapter Media Actions */}
+                                    <div className="flex items-center gap-2 flex-wrap pt-1">
+                                      {sub.videoUrl && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setActiveVideoPerLecture((prev) => ({
+                                              ...prev,
+                                              [lecture.id]: sub.videoUrl!,
+                                            }))
+                                            if (!isSectionOpen(lecture.id, "video")) {
+                                              toggleSection(lecture.id, "video")
+                                            }
+                                          }}
+                                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition-all cursor-pointer"
+                                        >
+                                          <Play className="size-3" />
+                                          <span>فيديو الشرح</span>
+                                        </button>
+                                      )}
+
+                                      {sub.pdfUrl && (
+                                        <a
+                                          href={sub.pdfUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/30 text-xs font-bold transition-all"
+                                        >
+                                          <FileText className="size-3" />
+                                          <span>{sub.pdfName || "سلايدات الشابتر (PDF)"}</span>
+                                          <ExternalLink className="size-2.5" />
+                                        </a>
+                                      )}
+
+                                      {sub.quiz && sub.quiz.length > 0 && (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleStartQuizSession(
+                                              { id: sub.id, title: `${lecture.title} - ${sub.title}` },
+                                              sub.quiz!
+                                            )
+                                          }
+                                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/15 hover:bg-primary/25 text-primary border border-primary/30 text-xs font-bold transition-all cursor-pointer"
+                                        >
+                                          <HelpCircle className="size-3" />
+                                          <span>كويز الشابتر ({sub.quiz.length} أسئلة)</span>
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
                       {/* Sub-item 1: الشرح والفيديوهات (NO AUTOPLAY & NO FRAME BEFORE SELECTION!) */}
                       {videos.length > 0 && (
                         <div className="space-y-2">
@@ -1224,6 +1733,16 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Live stopwatch / timer */}
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-muted/60 border border-border text-xs font-mono font-bold text-foreground">
+                <Clock className="size-3.5 text-primary animate-pulse" />
+                <span>
+                  {activeQuizSession.timeLimitSeconds
+                    ? `متبقي: ${formatStopwatch(Math.max(0, activeQuizSession.timeLimitSeconds - activeQuizSession.elapsedSeconds))}`
+                    : `الوقت: ${formatStopwatch(activeQuizSession.elapsedSeconds)}`}
+                </span>
+              </div>
+
               <Button
                 variant="ghost"
                 size="sm"
@@ -1273,7 +1792,7 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
                       </div>
 
                       {/* Score metric cards */}
-                      <div className="grid grid-cols-3 gap-3 sm:gap-4 max-w-md mx-auto pt-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 max-w-lg mx-auto pt-2">
                         <div className="p-3 sm:p-4 rounded-2xl bg-muted/40 border border-border/60">
                           <div className="text-xl sm:text-3xl font-black text-primary font-mono">{pct}%</div>
                           <div className="text-[11px] text-muted-foreground font-semibold mt-1">النسبة المئوية</div>
@@ -1285,6 +1804,12 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
                         <div className="p-3 sm:p-4 rounded-2xl bg-muted/40 border border-border/60">
                           <div className="text-xl sm:text-3xl font-black text-rose-400 font-mono">{total - correct}</div>
                           <div className="text-[11px] text-muted-foreground font-semibold mt-1">إجابات خاطئة</div>
+                        </div>
+                        <div className="p-3 sm:p-4 rounded-2xl bg-muted/40 border border-border/60">
+                          <div className="text-sm sm:text-lg font-black text-amber-400 font-mono">
+                            {formatDuration(activeQuizSession.elapsedSeconds)}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground font-semibold mt-1">الوقت المستغرق</div>
                         </div>
                       </div>
 
@@ -1576,6 +2101,136 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
                   </div>
                 )
               })()
+            )}
+          </div>
+        </div>
+      )}
+      {/* 6. Mistake Bank Modal (بنك الأسئلة ومراجعة الأخطاء) */}
+      {isMistakeBankOpen && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-200"
+          dir="rtl"
+        >
+          <div className="bg-card border border-border/80 rounded-3xl max-w-2xl w-full p-4 sm:p-6 space-y-5 shadow-2xl my-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-border/60">
+              <div className="flex items-center gap-2.5">
+                <div className="size-9 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center shrink-0">
+                  <AlertCircle className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-foreground">
+                    بنك مراجعة الأخطاء (Smart Mistake Bank)
+                  </h3>
+                  <p className="text-[11px] sm:text-xs text-muted-foreground">
+                    الأسئلة التي أخطأت في إجابتها سابقاً لتقوم بمراجعتها وإعادة التدرب عليها
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsMistakeBankOpen(false)}
+                className="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center cursor-pointer"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            {mistakesList.length === 0 ? (
+              <div className="py-12 text-center space-y-3">
+                <div className="size-14 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center mx-auto">
+                  <Sparkles className="size-7" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-sm font-bold text-foreground">لا توجد أخطاء مسجلة حالياً!</h4>
+                  <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                    رائع جداً! إما أنك لم تخطئ في أي كويز، أو قمت بمراجعة وتصحيح جميع أخطائك بنجاح.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+                  <span className="font-bold text-foreground">
+                    عدد الأسئلة المطلوب مراجعتها: {mistakesList.length}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      clearAllCourseMistakes(activeCourse.id)
+                      setMistakesList([])
+                      clearAllCourseMistakesInDb(activeCourse.id).catch(() => {/* silent */})
+                    }}
+                    className="text-rose-400 hover:text-rose-300 underline font-semibold cursor-pointer"
+                  >
+                    مسح السجل بالكامل
+                  </button>
+                </div>
+
+                <div className="max-h-[50vh] overflow-y-auto space-y-3 pe-1">
+                  {mistakesList.map((m) => (
+                    <div
+                      key={m.questionId}
+                      className="p-3.5 sm:p-4 rounded-2xl border border-border/70 bg-muted/20 space-y-2 text-start"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-bold text-primary px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20">
+                          {m.lectureTitle}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            clearResolvedMistake(activeCourse.id, m.questionId)
+                            setMistakesList(getCourseMistakes(activeCourse.id))
+                            removeMistakesFromDb(activeCourse.id, [m.questionId]).catch(() => {/* silent */})
+                          }}
+                          className="text-[11px] text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
+                        >
+                          تحديد كتم فهمه وتصحيحه ✓
+                        </button>
+                      </div>
+
+                      <div dir="ltr" className="text-xs sm:text-sm font-semibold text-foreground text-left font-sans">
+                        {m.questionText}
+                      </div>
+
+                      <div className="text-xs space-y-1 pt-1">
+                        <div className="text-rose-400 flex items-center gap-1.5 font-medium">
+                          <XCircle className="size-3.5 shrink-0" />
+                          <span>إجابتك السابقة: {m.options[m.userSelectedIndex] || "غير محددة"}</span>
+                        </div>
+                        <div className="text-emerald-400 flex items-center gap-1.5 font-bold">
+                          <CheckCircle2 className="size-3.5 shrink-0" />
+                          <span>الإجابة الصحيحة: {m.options[m.correctIndex]}</span>
+                        </div>
+                        {m.explanation && (
+                          <p dir="ltr" className="text-[11px] text-muted-foreground bg-muted/50 p-2 rounded-lg text-left font-sans mt-1">
+                            {m.explanation}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-2 border-t border-border/60">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsMistakeBankOpen(false)}
+                    className="text-xs font-bold"
+                  >
+                    إغلاق
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handlePracticeMistakes}
+                    className="bg-primary text-primary-foreground text-xs font-bold gap-1.5"
+                  >
+                    <Target className="size-3.5" />
+                    <span>بدء اختبار تدريبي على هذه الأخطاء الآن</span>
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
         </div>

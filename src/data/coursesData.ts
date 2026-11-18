@@ -39,6 +39,18 @@ export interface QuizQuestion {
   explanation?: string
 }
 
+export interface SubChapterItem {
+  id: string
+  title: string
+  summary?: string
+  videoUrl?: string
+  videoSource?: string
+  pdfUrl?: string
+  pdfName?: string
+  quiz?: QuizQuestion[]
+  order: number
+}
+
 export interface LectureChapter {
   id: string
   number: number
@@ -51,6 +63,7 @@ export interface LectureChapter {
   pdfs?: PdfItem[]
   roadmaps?: RoadmapItem[]
   quiz?: QuizQuestion[]
+  subChapters?: SubChapterItem[]
   topics: TopicItem[]
 }
 

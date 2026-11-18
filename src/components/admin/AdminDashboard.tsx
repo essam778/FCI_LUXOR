@@ -51,6 +51,7 @@ import {
   type PdfItem,
   type RoadmapItem,
   type QuizQuestion,
+  type SubChapterItem,
 } from "@/data/coursesData"
 
 // Preserve symbols, quotes, and mathematical syntax cleanly
@@ -232,7 +233,7 @@ export function AdminDashboard({
   // Edit Existing Lecture Studio Modal
   const [editingLecture, setEditingLecture] = React.useState<LectureChapter | null>(null)
   const [lectureStudioTab, setLectureStudioTab] = React.useState<
-    "info" | "videos" | "pdfs" | "roadmaps" | "quiz" | "topics"
+    "info" | "videos" | "pdfs" | "roadmaps" | "quiz" | "subchapters" | "topics"
   >("info")
   const [editLectureTitle, setEditLectureTitle] = React.useState("")
   const [editLectureSummary, setEditLectureSummary] = React.useState("")
@@ -240,6 +241,13 @@ export function AdminDashboard({
   const [editLecturePdfs, setEditLecturePdfs] = React.useState<PdfItem[]>([])
   const [editLectureRoadmaps, setEditLectureRoadmaps] = React.useState<RoadmapItem[]>([])
   const [editLectureQuiz, setEditLectureQuiz] = React.useState<QuizQuestion[]>([])
+  const [editLectureSubChapters, setEditLectureSubChapters] = React.useState<SubChapterItem[]>([])
+  const [editingSubChapterId, setEditingSubChapterId] = React.useState<string | null>(null)
+  const [subChapterFormTitle, setSubChapterFormTitle] = React.useState("")
+  const [subChapterFormSummary, setSubChapterFormSummary] = React.useState("")
+  const [subChapterFormVideoUrl, setSubChapterFormVideoUrl] = React.useState("")
+  const [subChapterFormPdfUrl, setSubChapterFormPdfUrl] = React.useState("")
+  const [subChapterFormPdfName, setSubChapterFormPdfName] = React.useState("")
 
   // Quiz Question Editor State (Full Edit Capability)
   const [editingQuizIndex, setEditingQuizIndex] = React.useState<number | null>(null)
@@ -650,6 +658,13 @@ export function AdminDashboard({
     setEditLecturePdfs(initialPdfs)
     setEditLectureRoadmaps(initialRoadmaps)
     setEditLectureQuiz(initialQuiz)
+    setEditLectureSubChapters(lec.subChapters ? [...lec.subChapters] : [])
+    setEditingSubChapterId(null)
+    setSubChapterFormTitle("")
+    setSubChapterFormSummary("")
+    setSubChapterFormVideoUrl("")
+    setSubChapterFormPdfUrl("")
+    setSubChapterFormPdfName("")
 
     // Reset sub forms & editing states
     setNewSubVideoTitle("")
@@ -887,6 +902,79 @@ export function AdminDashboard({
     setEditLectureQuiz((prev) => prev.filter((q) => q.id !== qId))
   }
 
+
+  // Sub-Chapters management inside lecture (Add, Edit, Reorder, Delete)
+  const handleStartEditSubChapter = (sub: SubChapterItem) => {
+    setEditingSubChapterId(sub.id)
+    setSubChapterFormTitle(sub.title)
+    setSubChapterFormSummary(sub.summary || "")
+    setSubChapterFormVideoUrl(sub.videoUrl || "")
+    setSubChapterFormPdfUrl(sub.pdfUrl || "")
+    setSubChapterFormPdfName(sub.pdfName || "")
+  }
+
+  const handleCancelEditSubChapter = () => {
+    setEditingSubChapterId(null)
+    setSubChapterFormTitle("")
+    setSubChapterFormSummary("")
+    setSubChapterFormVideoUrl("")
+    setSubChapterFormPdfUrl("")
+    setSubChapterFormPdfName("")
+  }
+
+  const handleSaveSubChapter = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!subChapterFormTitle.trim()) return
+    if (editingSubChapterId) {
+      setEditLectureSubChapters((prev) =>
+        prev.map((s) =>
+          s.id === editingSubChapterId
+            ? {
+                ...s,
+                title: cleanText(subChapterFormTitle),
+                summary: subChapterFormSummary ? cleanText(subChapterFormSummary) : undefined,
+                videoUrl: subChapterFormVideoUrl ? cleanText(subChapterFormVideoUrl) : undefined,
+                pdfUrl: subChapterFormPdfUrl ? cleanText(subChapterFormPdfUrl) : undefined,
+                pdfName: subChapterFormPdfName ? cleanText(subChapterFormPdfName) : undefined,
+              }
+            : s
+        )
+      )
+      setEditingSubChapterId(null)
+    } else {
+      const newSub: SubChapterItem = {
+        id: `sub-${Date.now()}`,
+        title: cleanText(subChapterFormTitle),
+        summary: subChapterFormSummary ? cleanText(subChapterFormSummary) : undefined,
+        videoUrl: subChapterFormVideoUrl ? cleanText(subChapterFormVideoUrl) : undefined,
+        pdfUrl: subChapterFormPdfUrl ? cleanText(subChapterFormPdfUrl) : undefined,
+        pdfName: subChapterFormPdfName ? cleanText(subChapterFormPdfName) : undefined,
+        order: editLectureSubChapters.length + 1,
+      }
+      setEditLectureSubChapters((prev) => [...prev, newSub])
+    }
+    setSubChapterFormTitle("")
+    setSubChapterFormSummary("")
+    setSubChapterFormVideoUrl("")
+    setSubChapterFormPdfUrl("")
+    setSubChapterFormPdfName("")
+  }
+
+  const handleDeleteSubChapter = (subId: string) => {
+    if (editingSubChapterId === subId) handleCancelEditSubChapter()
+    setEditLectureSubChapters((prev) => prev.filter((s) => s.id !== subId))
+  }
+
+  const handleMoveSubChapter = (index: number, direction: "up" | "down") => {
+    const targetIndex = direction === "up" ? index - 1 : index + 1
+    if (targetIndex < 0 || targetIndex >= editLectureSubChapters.length) return
+    const updated = [...editLectureSubChapters]
+    const temp = updated[index]
+    updated[index] = updated[targetIndex]
+    updated[targetIndex] = temp
+    setEditLectureSubChapters(updated.map((s, idx) => ({ ...s, order: idx + 1 })))
+  }
+
   // Media reordering inside Lecture Studio
   const handleMoveVideoInEdit = (index: number, direction: "up" | "down") => {
     const targetIndex = direction === "up" ? index - 1 : index + 1
@@ -949,6 +1037,7 @@ export function AdminDashboard({
           pdfs: editLecturePdfs,
           roadmaps: editLectureRoadmaps,
           quiz: editLectureQuiz,
+          subChapters: editLectureSubChapters,
         }
       }
       return lec
@@ -2433,6 +2522,20 @@ export function AdminDashboard({
 
               <button
                 type="button"
+                onClick={() => setLectureStudioTab("subchapters")}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                  lectureStudioTab === "subchapters"
+                    ? "bg-primary text-primary-foreground font-black shadow-xs"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <span>📑 Sub-Chapters (شباتر)</span>
+                <span className="text-[10px] font-mono px-1 rounded bg-black/20 text-white">
+                  {editLectureSubChapters.length}
+                </span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setLectureStudioTab("quiz")}
                 className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   lectureStudioTab === "quiz"
@@ -3102,6 +3205,73 @@ export function AdminDashboard({
                 </div>
               )}
 
+              {/* Studio Tab: Sub-Chapters */}
+              {lectureStudioTab === "subchapters" && (
+                <div className="space-y-4 animate-in fade-in-50">
+                  <div className="space-y-2">
+                    <h5 className="text-xs font-black text-foreground">
+                      شباتر المحاضرة ({editLectureSubChapters.length}):
+                    </h5>
+                    {editLectureSubChapters.length === 0 ? (
+                      <div className="p-5 rounded-2xl border border-dashed border-border text-center text-xs text-muted-foreground">
+                        لا توجد شباتر فرعية حتى الآن. أضف شابتر جديد من النموذج أدناه.
+                      </div>
+                    ) : (
+                      editLectureSubChapters.map((sub, sIdx) => (
+                        <div
+                          key={sub.id}
+                          className={`p-3 rounded-xl bg-card border flex items-center justify-between text-xs gap-3 ${
+                            editingSubChapterId === sub.id
+                              ? "border-primary ring-1 ring-primary/40 bg-primary/5"
+                              : "border-border/80"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 truncate flex-1">
+                            <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0">#{sIdx + 1}</span>
+                            <div className="truncate">
+                              <span className="font-bold text-foreground block truncate">{sub.title}</span>
+                              <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                                {sub.videoUrl && <span className="text-sky-400 flex items-center gap-1"><Video className="size-2.5" /> Video</span>}
+                                {sub.pdfUrl && <span className="text-emerald-400 flex items-center gap-1"><FileText className="size-2.5" /> PDF</span>}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <div className="flex items-center gap-0.5 bg-muted/40 p-0.5 rounded-lg border border-border/70">
+                              <button type="button" disabled={sIdx === 0} onClick={() => handleMoveSubChapter(sIdx, "up")} className="size-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:pointer-events-none cursor-pointer" title="Move up"><ChevronUp className="size-3" /></button>
+                              <button type="button" disabled={sIdx === editLectureSubChapters.length - 1} onClick={() => handleMoveSubChapter(sIdx, "down")} className="size-6 rounded flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:pointer-events-none cursor-pointer" title="Move down"><ChevronDown className="size-3" /></button>
+                            </div>
+                            <button type="button" onClick={() => handleStartEditSubChapter(sub)} className="text-muted-foreground hover:text-primary p-1 hover:bg-primary/10 rounded-md cursor-pointer" title="Edit"><Pencil className="size-3.5" /></button>
+                            <button type="button" onClick={() => handleDeleteSubChapter(sub.id)} className="text-muted-foreground hover:text-destructive p-1 hover:bg-destructive/10 rounded-md cursor-pointer" title="Delete"><Trash2 className="size-3.5" /></button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-card border border-border/80 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-foreground">
+                        {editingSubChapterId ? "✏️ تعديل الشابتر:" : "➕ إضافة شابتر جديد:"}
+                      </span>
+                      {editingSubChapterId && (
+                        <button type="button" onClick={handleCancelEditSubChapter} className="text-[11px] text-muted-foreground hover:text-foreground underline cursor-pointer">إلغاء</button>
+                      )}
+                    </div>
+                    <Input value={subChapterFormTitle} onChange={(e) => setSubChapterFormTitle(e.target.value)} placeholder="عنوان الشابتر..." className="text-xs bg-muted/20 h-9" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <Input value={subChapterFormVideoUrl} onChange={(e) => setSubChapterFormVideoUrl(e.target.value)} placeholder="رابط الفيديو (YouTube/Drive)..." className="text-xs bg-muted/20 h-9 font-mono" />
+                      <Input value={subChapterFormPdfUrl} onChange={(e) => setSubChapterFormPdfUrl(e.target.value)} placeholder="رابط PDF..." className="text-xs bg-muted/20 h-9 font-mono" />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      {editingSubChapterId && <Button type="button" variant="ghost" size="sm" onClick={handleCancelEditSubChapter} className="text-xs h-8 cursor-pointer">إلغاء</Button>}
+                      <Button type="button" size="sm" onClick={handleSaveSubChapter} disabled={!subChapterFormTitle.trim()} className="text-xs font-bold h-8 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer">
+                        {editingSubChapterId ? "حفظ التعديلات" : "+ إضافة الشابتر"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
               {/* Studio Modal Footer */}
               <div className="flex items-center justify-between pt-4 border-t border-border">
                 <Button

@@ -44,6 +44,17 @@ export function maskCourseForTeaser(course: Course): Course {
       pdfs: [],
       roadmaps: [],
       quiz: [],
+      subChapters: (lec.subChapters || []).map((sub) => ({
+        id: sub.id,
+        title: sub.title,
+        summary: "محتوى متاح للمشتركين فقط.",
+        videoUrl: undefined,
+        videoSource: undefined,
+        pdfUrl: undefined,
+        pdfName: undefined,
+        quiz: [],
+        order: sub.order,
+      })),
       topics: (lec.topics || []).map((t) => ({
         id: t.id,
         slug: t.slug,

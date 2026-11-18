@@ -1,6 +1,6 @@
 import { cache } from "react"
 import { createClient } from "@/lib/supabase/server"
-import type { Course, QuizQuestion } from "@/data/coursesData"
+import type { Course, QuizQuestion, SubChapterItem } from "@/data/coursesData"
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -28,23 +28,27 @@ function mapDbCourseToCourse(c: any): Course {
       const topicsList = (ch.topics as any[]) || []
       topicsList.sort((a, b) => (a.position || 0) - (b.position || 0))
 
-      // Extract all videos, pdfs, roadmaps, and quiz
+      // Extract all videos, pdfs, roadmaps, quiz, and nested sub-chapters
       const videosList: { id: string; title: string; url: string; source?: string }[] = []
       const pdfsList: { id: string; title: string; url: string; size?: string }[] = []
       const roadmapsList: { id: string; title: string; imageUrl: string; description?: string }[] = []
       let quizList: QuizQuestion[] = []
+      let subChaptersList: SubChapterItem[] = []
 
       let videoUrl: string | undefined
       let pdfUrl: string | undefined
       let pdfName: string | undefined
 
       for (const t of topicsList) {
-        // Check for serialized quiz questions stored in mindmap_md
+        // Check for serialized quiz questions and subChapters stored in mindmap_md
         if (t.mindmap_md) {
           try {
-            const parsedQuiz = JSON.parse(t.mindmap_md)
-            if (Array.isArray(parsedQuiz) && parsedQuiz.length > 0) {
-              quizList = parsedQuiz
+            const parsed = JSON.parse(t.mindmap_md)
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              quizList = parsed
+            } else if (parsed && typeof parsed === "object") {
+              if (Array.isArray(parsed.quiz)) quizList = parsed.quiz
+              if (Array.isArray(parsed.subChapters)) subChaptersList = parsed.subChapters
             }
           } catch {
             // Not JSON, ignore
@@ -143,6 +147,7 @@ function mapDbCourseToCourse(c: any): Course {
         pdfs: pdfsList,
         roadmaps: roadmapsList,
         quiz: quizList,
+        subChapters: subChaptersList,
         topics: customTopics,
       }
     }),

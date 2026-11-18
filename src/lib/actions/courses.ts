@@ -327,8 +327,15 @@ export async function syncFullCourseToDatabase(course: Course): Promise<{ succes
         continue
       }
 
-      // Serialize quiz questions in mindmap_md for full DB persistence
-      const serializedQuiz = Array.isArray(lec.quiz) && lec.quiz.length > 0 ? JSON.stringify(lec.quiz) : null
+      // Serialize quiz questions and subChapters in mindmap_md for full DB persistence
+      const hasQuiz = Array.isArray(lec.quiz) && lec.quiz.length > 0
+      const hasSubChapters = Array.isArray(lec.subChapters) && lec.subChapters.length > 0
+      const serializedMeta = hasQuiz || hasSubChapters
+        ? JSON.stringify({
+            quiz: lec.quiz || [],
+            subChapters: lec.subChapters || [],
+          })
+        : null
 
       // Upsert overview topic
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -340,7 +347,7 @@ export async function syncFullCourseToDatabase(course: Course): Promise<{ succes
             position: 1,
             title: lec.title,
             content_md: lec.summary || "",
-            mindmap_md: serializedQuiz,
+            mindmap_md: serializedMeta,
             importance: 3,
             status: "published",
           },

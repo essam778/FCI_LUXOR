@@ -48,12 +48,25 @@ function ResetPasswordForm() {
 
     try {
       const supabase = createClient()
+
+      // If URL has a recovery/auth code that hasn't been exchanged yet, exchange it first
+      const searchParams = new URLSearchParams(window.location.search)
+      const code = searchParams.get("code")
+      if (code) {
+        await supabase.auth.exchangeCodeForSession(code)
+      }
+
       const { error: updateError } = await supabase.auth.updateUser({
         password: password,
       })
 
       if (updateError) {
-        setError(updateError.message)
+        // If session is missing, provide a friendly explanation in Arabic
+        if (updateError.message.toLowerCase().includes("session") || updateError.message.toLowerCase().includes("auth")) {
+          setError("انتهت صلاحية رابط استعادة كلمة المرور أو تم استخدامه من قبل. يرجى طلب رابط جديد من صفحة تسجيل الدخول.")
+        } else {
+          setError(updateError.message)
+        }
       } else {
         setIsSuccess(true)
         setTimeout(() => {

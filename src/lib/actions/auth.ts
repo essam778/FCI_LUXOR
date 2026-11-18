@@ -140,7 +140,7 @@ export async function requestPasswordReset(
 
   const supabase = await createClient()
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    redirectTo: `${formattedOrigin}/reset-password`,
+    redirectTo: `${formattedOrigin}/auth/callback?next=/reset-password`,
   })
 
   if (error) {
