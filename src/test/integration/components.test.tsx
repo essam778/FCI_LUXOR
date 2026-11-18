@@ -137,30 +137,26 @@ describe("UI Components (Integration Tests)", () => {
   })
 
   describe("StudentNotesWidget", () => {
-    it("should open notebook and render starter notes for preview users", async () => {
+    it("should open notebook and display NOTES header without hardcoded starter notes", async () => {
       const user = userEvent.setup()
       render(<StudentNotesWidget initialUser={null} />)
 
-      const triggerBtn = screen.getByLabelText(/افتح دفتر الملاحظات السحابي/i)
+      const triggerBtn = screen.getByLabelText(/افتح دفتر الملاحظات NOTES/i)
       await user.click(triggerBtn)
 
-      expect(screen.getByText(/دفتر الملاحظات السحابي/i)).toBeInTheDocument()
-      expect(screen.getByText(/ملاحظات هامة — مادة الإلكترونيات/i)).toBeInTheDocument()
+      expect(screen.getByText("NOTES")).toBeInTheDocument()
+      // Should not contain hardcoded dummy notes
+      expect(screen.queryByText(/ملاحظات هامة — مادة الإلكترونيات/i)).not.toBeInTheDocument()
     })
 
-    it("should filter notes by search query", async () => {
+    it("should allow student to open and see clean empty state or add notes", async () => {
       const user = userEvent.setup()
       render(<StudentNotesWidget initialUser={null} />)
 
-      const triggerBtn = screen.getByLabelText(/افتح دفتر الملاحظات السحابي/i)
+      const triggerBtn = screen.getByLabelText(/افتح دفتر الملاحظات NOTES/i)
       await user.click(triggerBtn)
 
-      const searchInput = screen.getByPlaceholderText(/ابحث في ملاحظاتك/i)
-      await user.type(searchInput, "CS101")
-
-      // Only the CS101 note should match
-      expect(screen.getByText(/خوارزميات البرمجة الهيكلية/i)).toBeInTheDocument()
-      expect(screen.queryByText(/ملاحظات هامة — مادة الإلكترونيات/i)).not.toBeInTheDocument()
+      expect(screen.getByText(/لا توجد ملاحظات/i)).toBeInTheDocument()
     })
   })
 })

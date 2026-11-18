@@ -237,7 +237,7 @@ export function Navbar({ initialUser = null, initialDisplayName = null }: Navbar
 
         {/* Left (End in RTL): Auth actions, Notifications, & ThemeToggle */}
         <div className="hidden md:flex items-center gap-2">
-          <NotificationBell />
+          {user && <NotificationBell />}
           <ThemeToggle />
 
           {user ? (
@@ -342,7 +342,7 @@ export function Navbar({ initialUser = null, initialDisplayName = null }: Navbar
 
         {/* Mobile menu controls: Notifications, Theme, & Hamburger */}
         <div className="flex md:hidden items-center gap-1.5">
-          <NotificationBell />
+          {user && <NotificationBell />}
           <ThemeToggle />
           <Button
             variant="ghost"

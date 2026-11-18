@@ -27,31 +27,6 @@ import type { Database } from "@/types/database"
 
 type StudentNote = Database["public"]["Tables"]["student_notes"]["Row"]
 
-const STARTER_STUDY_NOTES: StudentNote[] = [
-  {
-    id: "starter-note-1",
-    user_id: "preview",
-    title: "ملاحظات هامة — مادة الإلكترونيات (ELEC105)",
-    content: "مراجعة قانون كيرشوف للجهد (KVL) وقانون كيرشوف للتيار (KCL). خواص أشباه الموصلات من النوعين N-type و P-type، ومنطقة النضوب (Depletion Region) في الدايود ودوائر التقويم.",
-    course_code: "ELEC105",
-    color: "emerald",
-    is_pinned: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    id: "starter-note-2",
-    user_id: "preview",
-    title: "ملخص خوارزميات البرمجة الهيكلية (CS101)",
-    content: "قواعد كتابة الدوال النظيفة، مفاهيم التكرار (Recursion vs Iteration)، وطرق إدارة الذاكرة والمؤشرات (Pointers) في لغة C++ ومصفوفات البنيات.",
-    course_code: "CS101",
-    color: "sky",
-    is_pinned: false,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-]
-
 interface StudentNotesWidgetProps {
   initialUser?: User | null
 }
@@ -112,7 +87,7 @@ function formatRelativeTime(dateStr: string): string {
 export function StudentNotesWidget({ initialUser = null }: StudentNotesWidgetProps) {
   const [user, setUser] = React.useState<User | null>(initialUser)
   const [isOpen, setIsOpen] = React.useState(false)
-  const [notes, setNotes] = React.useState<StudentNote[]>(STARTER_STUDY_NOTES)
+  const [notes, setNotes] = React.useState<StudentNote[]>([])
   const [loading, setLoading] = React.useState(false)
   const [search, setSearch] = React.useState("")
   const [filterCourse, setFilterCourse] = React.useState<string>("all")
@@ -162,7 +137,7 @@ export function StudentNotesWidget({ initialUser = null }: StudentNotesWidgetPro
   // Fetch real notes from Supabase database
   const fetchNotes = React.useCallback(async () => {
     if (!user) {
-      if (notes.length === 0) setNotes(STARTER_STUDY_NOTES)
+      setNotes([])
       return
     }
     setLoading(true)
@@ -177,19 +152,15 @@ export function StudentNotesWidget({ initialUser = null }: StudentNotesWidgetPro
 
       if (error) {
         console.warn("Could not fetch student_notes:", error.message)
-        if (notes.length === 0) setNotes(STARTER_STUDY_NOTES)
-      } else if (data && data.length > 0) {
+      } else if (data) {
         setNotes(data as StudentNote[])
-      } else {
-        setNotes(STARTER_STUDY_NOTES)
       }
     } catch (err) {
       console.warn("Error in fetchNotes:", err)
-      if (notes.length === 0) setNotes(STARTER_STUDY_NOTES)
     } finally {
       setLoading(false)
     }
-  }, [user, notes.length])
+  }, [user])
 
   // Initial fetch and Realtime sync
   React.useEffect(() => {
@@ -469,12 +440,9 @@ export function StudentNotesWidget({ initialUser = null }: StudentNotesWidgetPro
                 <StickyNote className="size-5" />
               </div>
               <div className="min-w-0">
-                <h4 className="text-sm font-black text-foreground truncate">
-                  دفتر الملاحظات السحابي
+                <h4 className="text-sm font-black text-foreground tracking-wider font-mono">
+                  NOTES
                 </h4>
-                <p className="text-[10px] text-muted-foreground font-semibold truncate">
-                  قاعدة بيانات سحابية مشفرة • Supabase Realtime
-                </p>
               </div>
             </div>
 
@@ -734,12 +702,12 @@ export function StudentNotesWidget({ initialUser = null }: StudentNotesWidgetPro
                     </div>
                     <div className="space-y-1">
                       <p className="text-xs font-bold text-foreground">
-                        {search.trim() ? "لا توجد ملاحظات مطابقة لبحثك" : "دفترك السحابي فارغ حالياً"}
+                        {search.trim() ? "لا توجد ملاحظات مطابقة لبحثك" : "لا توجد ملاحظات مسجلة بعد"}
                       </p>
                       <p className="text-[11px] text-muted-foreground">
                         {search.trim()
                           ? "جرّب البحث بكلمة أخرى أو قم بإلغاء الفلاتر"
-                          : "اضغط على زر (جديدة) بالأعلى لإضافة ملخصك الأول لمواد الكلية."}
+                          : "اضغط على زر (كتابة ملاحظة الآن) لإضافة أول ملخص وملاحظة لك."}
                       </p>
                     </div>
                     {!search.trim() && (
@@ -856,8 +824,8 @@ export function StudentNotesWidget({ initialUser = null }: StudentNotesWidgetPro
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
           className="relative size-13 rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/35 hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center border border-white/20 cursor-pointer"
-          title="دفتر الملاحظات السحابي"
-          aria-label="افتح دفتر الملاحظات السحابي"
+          title="NOTES"
+          aria-label="افتح دفتر الملاحظات NOTES"
         >
           {isOpen ? (
             <X className="size-6 stroke-[2.5] animate-in spin-in-90 duration-200" />
@@ -875,8 +843,8 @@ export function StudentNotesWidget({ initialUser = null }: StudentNotesWidgetPro
 
         {/* Tooltip Label on hover */}
         {!isOpen && (
-          <span className="pointer-events-none absolute bottom-full mb-2 left-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs font-bold bg-card/95 text-foreground px-3 py-1.5 rounded-xl border border-border shadow-lg backdrop-blur-md whitespace-nowrap">
-            دفتر ملاحظاتي السحابي
+          <span className="pointer-events-none absolute bottom-full mb-2 left-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-xs font-bold bg-card/95 text-foreground px-3 py-1.5 rounded-xl border border-border shadow-lg backdrop-blur-md whitespace-nowrap font-mono tracking-wide">
+            NOTES
           </span>
         )}
       </div>

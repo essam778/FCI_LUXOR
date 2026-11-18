@@ -50,12 +50,15 @@ export function NotificationBell() {
   const [isAdmin, setIsAdmin] = React.useState(false)
   const popoverRef = React.useRef<HTMLDivElement>(null)
 
-  // 1. Load current user ID & Read IDs & User Profile
+  // 1. Check user authentication. Strictly only authenticated users can see or fetch notifications.
   React.useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(async ({ data }) => {
+
+    const checkAuth = async () => {
+      const { data } = await supabase.auth.getUser()
       const uId = data.user?.id || null
       setCurrentUserId(uId)
+
       if (uId) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: profile } = await (supabase.from("profiles") as any)
@@ -67,24 +70,54 @@ export function NotificationBell() {
           setUserLevel(profile.level || 1)
           setIsAdmin(profile.role === "admin" || profile.role === "editor")
         }
-      }
 
-      if (typeof window !== "undefined") {
-        try {
-          const key = uId ? `fci_read_notifs_${uId}` : "fci_read_notifs_guest"
-          const stored = localStorage.getItem(key)
-          if (stored) {
-            setReadIds(new Set(JSON.parse(stored)))
+        if (typeof window !== "undefined") {
+          try {
+            const key = `fci_read_notifs_${uId}`
+            const stored = localStorage.getItem(key)
+            if (stored) {
+              setReadIds(new Set(JSON.parse(stored)))
+            }
+          } catch {
+            // ignore
           }
-        } catch {
-          // ignore
         }
+      } else {
+        setIsLoading(false)
+        setNotifications([])
+      }
+    }
+
+    checkAuth()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      const uId = session?.user?.id || null
+      setCurrentUserId(uId)
+      if (!uId) {
+        setNotifications([])
+        setUserLevel(null)
+        setIsAdmin(false)
+        setIsLoading(false)
+      } else {
+        checkAuth()
       }
     })
+
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [])
 
-  // 2. Fetch ground truth notifications directly from Supabase DB
+  // 2. Fetch ground truth notifications directly from Supabase DB (authenticated users only)
   const fetchDbNotifications = React.useCallback(async () => {
+    if (!currentUserId) {
+      setNotifications([])
+      setIsLoading(false)
+      return
+    }
+
     try {
       const supabase = createClient()
       const { data, error } = await supabase
@@ -104,16 +137,18 @@ export function NotificationBell() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [currentUserId])
 
   // Listen for read updates across multiple mounted instances (desktop + mobile)
   React.useEffect(() => {
+    if (!currentUserId) return
+
     const handleSync = (e: Event) => {
       const custom = e as CustomEvent<string[]>
       if (custom.detail) {
         setReadIds(new Set(custom.detail))
       } else if (typeof window !== "undefined") {
-        const key = currentUserId ? `fci_read_notifs_${currentUserId}` : "fci_read_notifs_guest"
+        const key = `fci_read_notifs_${currentUserId}`
         const stored = localStorage.getItem(key)
         if (stored) {
           try {
@@ -129,10 +164,11 @@ export function NotificationBell() {
   }, [currentUserId])
 
   React.useEffect(() => {
+    if (!currentUserId) return
+
     fetchDbNotifications()
 
     // 3. Setup Supabase Realtime Subscription for live instant notifications
-    // Use unique channel identifier to avoid duplicate subscription collisions across instances
     const supabase = createClient()
     const uniqueChannelName = `notifs_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`
     const channel = supabase
@@ -169,7 +205,7 @@ export function NotificationBell() {
       supabase.removeChannel(channel)
       window.removeEventListener("fci_new_notification", handleLocalNew)
     }
-  }, [fetchDbNotifications])
+  }, [currentUserId, fetchDbNotifications])
 
   // Filter notifications visible to this user:
   // - If admin, sees all
@@ -201,9 +237,9 @@ export function NotificationBell() {
   const markAllAsRead = () => {
     const allIds = new Set(visibleNotifications.map((n) => n.id))
     setReadIds(allIds)
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && currentUserId) {
       try {
-        const key = currentUserId ? `fci_read_notifs_${currentUserId}` : "fci_read_notifs_guest"
+        const key = `fci_read_notifs_${currentUserId}`
         localStorage.setItem(key, JSON.stringify(Array.from(allIds)))
         window.dispatchEvent(
           new CustomEvent("fci_notifs_read_updated", { detail: Array.from(allIds) })
@@ -220,9 +256,9 @@ export function NotificationBell() {
       const next = new Set(readIds)
       next.add(item.id)
       setReadIds(next)
-      if (typeof window !== "undefined") {
+      if (typeof window !== "undefined" && currentUserId) {
         try {
-          const key = currentUserId ? `fci_read_notifs_${currentUserId}` : "fci_read_notifs_guest"
+          const key = `fci_read_notifs_${currentUserId}`
           localStorage.setItem(key, JSON.stringify(Array.from(next)))
           window.dispatchEvent(
             new CustomEvent("fci_notifs_read_updated", { detail: Array.from(next) })
@@ -232,6 +268,11 @@ export function NotificationBell() {
         }
       }
     }
+  }
+
+  // Strictly do NOT render the notification bell for unauthenticated visitors
+  if (!currentUserId) {
+    return null
   }
 
   return (
@@ -251,143 +292,148 @@ export function NotificationBell() {
         )}
       </button>
 
+      {/* Dropdown Popover */}
       {isOpen && (
-        <div className="fixed sm:absolute inset-x-3 sm:inset-x-auto end-2 sm:end-0 top-14 sm:top-full mt-1 sm:mt-2 w-auto sm:w-96 max-w-[calc(100vw-16px)] rounded-2xl border border-border/80 bg-card/95 backdrop-blur-xl p-3 shadow-2xl z-50 space-y-3 animate-in fade-in-50 zoom-in-95 duration-150">
+        <div className="absolute end-0 top-full mt-2 w-80 sm:w-96 rounded-2xl border border-border bg-card/95 backdrop-blur-md p-3 shadow-2xl z-50 animate-in fade-in-50 zoom-in-95 duration-150 text-start">
           {/* Header */}
-          <div className="flex items-center justify-between pb-2 border-b border-border/60 px-1">
-            <div className="flex items-center gap-1.5 font-black text-xs sm:text-sm text-foreground">
-              <Bell className="size-3.5 text-primary" />
-              <span>الإشعارات وتحديثات المنصة</span>
+          <div className="flex items-center justify-between pb-2 mb-2 border-b border-border/60">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-foreground">الإشعارات</span>
+              {unreadCount > 0 && (
+                <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                  {unreadCount} جديد
+                </span>
+              )}
             </div>
             {unreadCount > 0 && (
               <button
                 type="button"
                 onClick={markAllAsRead}
-                className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer"
+                className="flex items-center gap-1 text-[11px] font-bold text-muted-foreground hover:text-primary transition-colors cursor-pointer"
               >
-                <CheckCheck className="size-3" />
-                <span>تحديد الكل كمقروء</span>
+                <CheckCheck className="size-3.5" />
+                <span>تعيين الكل كمقروء</span>
               </button>
             )}
           </div>
 
-          {/* List of Real Notifications */}
-          <div className="space-y-2 max-h-84 overflow-y-auto pe-1">
+          {/* List */}
+          <div className="max-h-[360px] overflow-y-auto space-y-1.5 divide-y divide-border/30">
             {isLoading ? (
-              <div className="py-8 text-center text-xs text-muted-foreground space-y-2">
-                <div className="size-5 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-                <p>جاري جلب الإشعارات الفورية...</p>
+              <div className="p-6 text-center text-xs text-muted-foreground">
+                جاري تحميل الإشعارات...
               </div>
             ) : visibleNotifications.length === 0 ? (
-              <div className="py-10 text-center text-muted-foreground space-y-2">
-                <div className="size-10 rounded-xl bg-muted/60 flex items-center justify-center mx-auto text-muted-foreground/60 border border-border/60">
+              <div className="p-8 text-center space-y-2">
+                <div className="size-10 rounded-full bg-muted/60 flex items-center justify-center mx-auto text-muted-foreground">
                   <Inbox className="size-5" />
                 </div>
-                <div className="space-y-0.5">
-                  <p className="text-xs font-bold text-foreground">لا توجد إشعارات حالياً</p>
-                  <p className="text-[11px]">سيتم إشعارك فور نشر محاضرات أو ملخصات جديدة.</p>
-                </div>
+                <p className="text-xs font-semibold text-muted-foreground">
+                  لا توجد إشعارات جديدة حالياً
+                </p>
               </div>
             ) : (
               visibleNotifications.map((item) => {
                 const isUnread = !readIds.has(item.id)
-                let targetLink = item.link && item.link.trim() ? item.link : "/courses"
-                const lowerText = `${item.title} ${item.message}`.toLowerCase()
-                if (targetLink === "/courses" || !item.link) {
-                  if (
-                    lowerText.includes("أشباه الموصلات") ||
-                    lowerText.includes("إلكترونيات") ||
-                    lowerText.includes("semiconductor") ||
-                    lowerText.includes("electronics")
-                  ) {
-                    targetLink = "/courses/electronics-fundamentals?lecture=elec-lec-1"
-                  } else if (
-                    lowerText.includes("برمجة") ||
-                    lowerText.includes("programming") ||
-                    lowerText.includes("c++")
-                  ) {
-                    targetLink = "/courses/structured-programming"
-                  } else if (
-                    lowerText.includes("تفاضل") ||
-                    lowerText.includes("رياضيات") ||
-                    lowerText.includes("calculus")
-                  ) {
-                    targetLink = "/courses/calculus-1"
-                  } else if (lowerText.includes("فيزياء") || lowerText.includes("physics")) {
-                    targetLink = "/courses/physics-1"
-                  }
-                }
-                const isPersonal = item.target_type === "user" && item.target_user_id === currentUserId
-                const isLevel = item.target_type === "level"
+
+                const typeConfig = {
+                  info: {
+                    badge: "معلومات",
+                    icon: Info,
+                    border: "border-sky-500/20",
+                    bg: "bg-sky-500/10",
+                    text: "text-sky-500",
+                  },
+                  warning: {
+                    badge: "تنبيه هام",
+                    icon: AlertTriangle,
+                    border: "border-amber-500/20",
+                    bg: "bg-amber-500/10",
+                    text: "text-amber-500",
+                  },
+                  update: {
+                    badge: "تحديث أكاديمي",
+                    icon: CheckCircle2,
+                    border: "border-primary/20",
+                    bg: "bg-primary/10",
+                    text: "text-primary",
+                  },
+                  success: {
+                    badge: "إشعار إيجابي",
+                    icon: CheckCircle2,
+                    border: "border-emerald-500/20",
+                    bg: "bg-emerald-500/10",
+                    text: "text-emerald-500",
+                  },
+                }[item.notification_type || "info"]
+
+                const IconComponent = typeConfig.icon
 
                 return (
-                  <Link
+                  <div
                     key={item.id}
-                    href={targetLink}
                     onClick={() => handleNotificationClick(item)}
-                    className={`block p-3 rounded-xl border text-start transition-all cursor-pointer relative ${
-                      isUnread
-                        ? "bg-primary/10 border-primary/30 shadow-xs hover:bg-primary/15 ring-1 ring-primary/20"
-                        : "bg-card border-border/60 hover:bg-muted/30"
+                    className={`pt-2 first:pt-0 p-2.5 rounded-xl transition-colors cursor-pointer ${
+                      isUnread ? "bg-muted/40 hover:bg-muted/60" : "hover:bg-muted/20 opacity-80"
                     }`}
                   >
-                    {isUnread && (
-                      <span className="absolute top-3 end-3 size-2 rounded-full bg-primary" />
-                    )}
-                    <div className="space-y-1.5 pe-4">
-                      {/* Badges */}
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {item.notification_type === "warning" && (
-                          <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-500 border border-amber-500/20">
-                            <AlertTriangle className="size-2.5" />
-                            <span>تنبيه هام</span>
-                          </span>
-                        )}
-                        {item.notification_type === "success" && (
-                          <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-500 border border-emerald-500/20">
-                            <CheckCircle2 className="size-2.5" />
-                            <span>تهنئة</span>
-                          </span>
-                        )}
-                        {item.notification_type === "update" && (
-                          <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-cyan-500/15 text-cyan-500 border border-cyan-500/20">
-                            <Info className="size-2.5" />
-                            <span>تحديث مقرر</span>
-                          </span>
-                        )}
-
-                        {isPersonal && (
-                          <span className="inline-flex items-center gap-1 text-[9px] font-black px-1.5 py-0.5 rounded-md bg-purple-500/15 text-purple-400 border border-purple-500/25">
-                            <UserCheck className="size-2.5" />
-                            <span>إشعار شخصي لك</span>
-                          </span>
-                        )}
-
-                        {isLevel && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground border border-border">
-                            الفرقة {item.target_level}
-                          </span>
-                        )}
+                    <div className="flex items-start gap-2.5">
+                      <div
+                        className={`size-8 rounded-lg shrink-0 flex items-center justify-center ${typeConfig.bg} ${typeConfig.text} mt-0.5`}
+                      >
+                        <IconComponent className="size-4" />
                       </div>
 
-                      <p className="text-xs font-black text-foreground flex items-center gap-1.5 leading-snug">
-                        <span>{item.title}</span>
-                      </p>
-                      <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2">
-                        {item.message}
-                      </p>
-                      <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground font-semibold">
-                        <span className="flex items-center gap-1 font-mono">
-                          <Clock className="size-2.5 text-primary" />
-                          <span>{formatRelativeTime(item.created_at)}</span>
-                        </span>
-                        <span className="text-primary flex items-center gap-0.5 hover:underline font-bold">
-                          <span>انتقال للمحتوى</span>
-                          <ExternalLink className="size-2.5" />
-                        </span>
+                      <div className="flex-1 space-y-1 overflow-hidden">
+                        <div className="flex items-center justify-between gap-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-bold text-foreground truncate">
+                              {item.title}
+                            </span>
+                            {item.target_type === "user" && (
+                              <span className="text-[9px] font-black px-1.5 py-0.2 rounded-md bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30 flex items-center gap-0.5">
+                                <UserCheck className="size-2.5" />
+                                <span>موجه لك</span>
+                              </span>
+                            )}
+                            {item.target_type === "level" && (
+                              <span className="text-[9px] font-black px-1.5 py-0.2 rounded-md bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30">
+                                الفرقة {item.target_level}
+                              </span>
+                            )}
+                          </div>
+                          {isUnread && (
+                            <span className="size-1.5 rounded-full bg-primary shrink-0" />
+                          )}
+                        </div>
+
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                          {item.message}
+                        </p>
+
+                        <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Clock className="size-3" />
+                            <span>{formatRelativeTime(item.created_at)}</span>
+                          </span>
+
+                          {item.link && (
+                            <Link
+                              href={item.link}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setIsOpen(false)
+                              }}
+                              className="text-primary hover:underline font-bold inline-flex items-center gap-0.5"
+                            >
+                              <span>فتح</span>
+                              <ExternalLink className="size-3" />
+                            </Link>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </Link>
+                  </div>
                 )
               })
             )}
