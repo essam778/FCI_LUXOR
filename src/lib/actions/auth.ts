@@ -5,6 +5,11 @@ import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { loginSchema, signupSchema, resetPasswordSchema, updatePasswordSchema } from "@/lib/validators/auth"
+import {
+  addDeviceToken,
+  removeDeviceToken,
+  MAX_ACTIVE_DEVICES,
+} from "@/lib/auth/deviceSession"
 
 export type AuthActionResult = {
   success?: boolean
@@ -37,17 +42,29 @@ export async function login(
     return { error: error.message === "Invalid login credentials" ? "البريد الإلكتروني أو كلمة المرور غير صحيحة" : error.message }
   }
 
-  // Single Device Enforcement: Generate a unique device session token
+  // 2-Device Policy: Register a unique device session token (up to 2 devices)
   if (authData?.user) {
     const sessionToken = crypto.randomUUID()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const client: any = createAdminClient() || supabase
 
     try {
+      const { data: profile } = await client
+        .from("profiles")
+        .select("active_session_token")
+        .eq("id", authData.user.id)
+        .maybeSingle()
+
+      const updatedTokens = addDeviceToken(
+        profile?.active_session_token,
+        sessionToken,
+        MAX_ACTIVE_DEVICES
+      )
+
       await client
         .from("profiles")
         .update({
-          active_session_token: sessionToken,
+          active_session_token: updatedTokens,
           last_active_at: new Date().toISOString(),
         })
         .eq("id", authData.user.id)
@@ -110,7 +127,35 @@ export async function signup(
   }
 
   // If user is immediately signed in (e.g. email confirmation off)
-  if (data.session) {
+  if (data.session && data.user) {
+    const sessionToken = crypto.randomUUID()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client: any = createAdminClient() || supabase
+    try {
+      await client
+        .from("profiles")
+        .update({
+          active_session_token: sessionToken,
+          last_active_at: new Date().toISOString(),
+        })
+        .eq("id", data.user.id)
+    } catch (e) {
+      console.warn("[signup] Error setting initial active_session_token:", e)
+    }
+
+    try {
+      const cookieStore = await cookies()
+      cookieStore.set("fci_device_session", sessionToken, {
+        path: "/",
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+      })
+    } catch {
+      // ignore
+    }
+
     revalidatePath("/", "layout")
     redirect("/dashboard")
   }
@@ -186,7 +231,37 @@ export async function updatePassword(
 export async function logout() {
   const supabase = await createClient()
   try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
     const cookieStore = await cookies()
+    const clientToken = cookieStore.get("fci_device_session")?.value
+
+    if (user && clientToken) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const client: any = createAdminClient() || supabase
+      try {
+        const { data: profile } = await client
+          .from("profiles")
+          .select("active_session_token")
+          .eq("id", user.id)
+          .maybeSingle()
+
+        if (profile?.active_session_token) {
+          const remainingTokens = removeDeviceToken(profile.active_session_token, clientToken)
+          await client
+            .from("profiles")
+            .update({
+              active_session_token: remainingTokens,
+            })
+            .eq("id", user.id)
+        }
+      } catch (err) {
+        console.warn("[logout] Error updating active_session_token on sign out:", err)
+      }
+    }
+
     cookieStore.delete("fci_device_session")
     // Explicitly delete all Supabase auth cookies
     const allCookies = cookieStore.getAll()
@@ -199,7 +274,8 @@ export async function logout() {
     // ignore
   }
   try {
-    await supabase.auth.signOut({ scope: "global" })
+    // Local scope signout so the user's second active device is not logged out
+    await supabase.auth.signOut({ scope: "local" })
   } catch {
     // ignore
   }

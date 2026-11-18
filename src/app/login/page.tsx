@@ -38,12 +38,6 @@ function LoginForm() {
     setGoogleError(null)
     try {
       const supabase = createClient()
-      try {
-        await supabase.auth.signOut()
-      } catch {
-        // ignore
-      }
-
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -100,7 +94,7 @@ function LoginForm() {
         <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-500">
           <AlertCircle className="size-4 shrink-0 mt-0.5" />
           <p className="text-xs font-semibold leading-relaxed">
-            تم تسجيل الدخول بحسابك من جهاز آخر، تم تسجيل خروجك لحماية الحساب.
+            تم تسجيل الدخول بحسابك من أجهزة جديدة وتجاوز الحد المسموح (جهازين: هاتف ولابتوب/تابلت). تم تسجيل خروج هذا الجهاز تلقائياً لحماية حسابك.
           </p>
         </div>
       )}
@@ -113,7 +107,7 @@ function LoginForm() {
             {googleError
               ? googleError
               : urlError === "auth_callback_failed"
-              ? "فشل التحقق من الرابط أو انتهت صلاحيته. يُرجى تسجيل الدخول مجدداً."
+              ? searchParams.get("message") || "فشل التحقق من الرابط أو انتهت صلاحيته. يُرجى تسجيل الدخول مجدداً."
               : state?.error}
           </p>
         </div>

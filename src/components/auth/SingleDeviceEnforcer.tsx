@@ -22,17 +22,7 @@ export function SingleDeviceEnforcer() {
     try {
       const res = await verifyDeviceSessionAction()
       if (!res.valid && res.reason === "other_device") {
-        // Double check after 1500ms to eliminate race conditions
-        setTimeout(async () => {
-          try {
-            const recheck = await verifyDeviceSessionAction()
-            if (!recheck.valid && recheck.reason === "other_device") {
-              router.replace("/login?error=session_expired_other_device")
-            }
-          } catch {
-            // ignore
-          }
-        }, 1500)
+        router.replace("/login?error=session_expired_other_device")
       }
     } catch {
       // ignore network hiccups
