@@ -19,30 +19,23 @@ import {
   X,
   RotateCcw,
   CheckCircle2,
-  XCircle,
   ShieldCheck,
   Video,
   Cloud,
   Award,
   ArrowRight,
-  ArrowLeft,
   Check,
-  Clock,
   Target,
   AlertCircle,
-  Sparkles,
   Flame,
   CheckSquare,
   Square,
   TrendingUp,
-  FileQuestion,
-  GraduationCap,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Course, LectureChapter, VideoItem, PdfItem, RoadmapItem, QuizQuestion } from "@/data/coursesData"
 import {
   formatDuration,
-  formatStopwatch,
   getCourseMistakes,
   seedMistakesCache,
   recordQuizMistakes,
@@ -62,7 +55,6 @@ import {
 } from "@/lib/quizTracker"
 import {
   fetchCourseProgress,
-  upsertCourseProgress,
   addStudyTimeToDb,
   toggleLectureCompletionInDb,
   markQuizPassedInDb,
@@ -73,18 +65,13 @@ import {
   logQuizAttemptToDb,
   fetchCourseQuizAttemptsFromDb,
 } from "@/lib/actions/analytics"
+import { parseCourseTitle } from "@/lib/utils"
+import { QuizAssessmentModal, type ActiveQuizSession } from "./QuizAssessmentModal"
+import { MistakeBankModal } from "./MistakeBankModal"
 
 interface CourseStudyViewProps {
   course: Course
   isFreeTrial?: boolean
-}
-
-function parseCourseTitle(title: string): { ar: string; en: string } {
-  const match = title.match(/^(.*?)\s*\((.*?)\)$/)
-  if (match) {
-    return { ar: match[1].trim(), en: match[2].trim() }
-  }
-  return { ar: title, en: "" }
 }
 
 function getEmbedUrl(rawUrl?: string): string | null {
@@ -358,18 +345,7 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
   }, [activeCourse.id])
 
   // Active Dedicated Standalone Quiz Assessment Modal
-  const [activeQuizSession, setActiveQuizSession] = React.useState<{
-    lectureId: string
-    lectureTitle: string
-    questions: QuizQuestion[]
-    currentIndex: number
-    isGraded: boolean
-    startTime: number
-    elapsedSeconds: number
-    isMockExam?: boolean
-    isMistakePractice?: boolean
-    timeLimitSeconds?: number
-  } | null>(null)
+  const [activeQuizSession, setActiveQuizSession] = React.useState<ActiveQuizSession | null>(null)
 
   // Live Stopwatch for Active Quiz Session
   React.useEffect(() => {
@@ -1705,536 +1681,33 @@ export function CourseStudyView({ course, isFreeTrial = false }: CourseStudyView
       )}
 
       {/* 5. Standalone Dedicated Fullscreen Quiz Assessment Modal */}
-      {activeQuizSession && (
-        <div
-          className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-xl flex flex-col justify-between overflow-y-auto animate-in fade-in duration-200"
-          dir="rtl"
-        >
-          {/* Header Bar */}
-          <div className="w-full border-b border-border/60 bg-card/80 backdrop-blur-md px-4 sm:px-8 py-3.5 flex items-center justify-between sticky top-0 z-10">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 shrink-0">
-                <HelpCircle className="size-5" />
-              </div>
-              <div className="text-start">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-black text-primary uppercase tracking-wider font-mono">
-                    {course.code}
-                  </span>
-                  <span className="text-xs text-muted-foreground">•</span>
-                  <span className="text-xs text-muted-foreground font-semibold truncate max-w-[200px] sm:max-w-md">
-                    {activeQuizSession.lectureTitle}
-                  </span>
-                </div>
-                <h3 className="text-xs sm:text-sm font-bold text-foreground">
-                  {activeQuizSession.isGraded ? "تقرير أداء الاختبار الأكاديمي" : "الاختبار التفاعلي المباشر"}
-                </h3>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {/* Live stopwatch / timer */}
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-muted/60 border border-border text-xs font-mono font-bold text-foreground">
-                <Clock className="size-3.5 text-primary animate-pulse" />
-                <span>
-                  {activeQuizSession.timeLimitSeconds
-                    ? `متبقي: ${formatStopwatch(Math.max(0, activeQuizSession.timeLimitSeconds - activeQuizSession.elapsedSeconds))}`
-                    : `الوقت: ${formatStopwatch(activeQuizSession.elapsedSeconds)}`}
-                </span>
-              </div>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setActiveQuizSession(null)}
-                className="h-9 px-3 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted text-xs font-bold gap-1 cursor-pointer"
-              >
-                <span>العودة للمحاضرة</span>
-                <X className="size-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Body Content */}
-          <div className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-8 flex flex-col justify-center">
-            {activeQuizSession.isGraded ? (
-              /* ===== SCORECARD & COMPREHENSIVE REVIEW ===== */
-              <div className="space-y-6 animate-in zoom-in-95 duration-200 py-4">
-                {/* Score Hero Card */}
-                {(() => {
-                  const currentAnswers = quizAnswers[activeQuizSession.lectureId] || {}
-                  const total = activeQuizSession.questions.length
-                  const correct = activeQuizSession.questions.filter(
-                    (q) => currentAnswers[q.id] === q.correctIndex
-                  ).length
-                  const pct = total > 0 ? Math.round((correct / total) * 100) : 0
-
-                  const isPassed = pct >= 60
-                  const isExcellent = pct >= 85
-
-                  return (
-                    <div className="p-6 sm:p-8 rounded-3xl border border-border bg-gradient-to-b from-card to-card/60 shadow-2xl space-y-6 text-center relative overflow-hidden">
-                      <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-emerald-500 via-sky-500 to-indigo-500" />
-
-                      <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 mx-auto">
-                        <Award className="size-8" />
-                      </div>
-
-                      <div className="space-y-1">
-                        <h2 className="text-xl sm:text-2xl font-black text-foreground">
-                          {isExcellent ? "أداء استثنائي ومتميز" : isPassed ? "اجتياز الاختبار بنجاح" : "بحاجة لمزيد من المراجعة"}
-                        </h2>
-                        <p className="text-xs sm:text-sm text-muted-foreground">
-                          {isPassed
-                            ? "أظهرت استيعاباً متميزاً لمفاهيم المحاضرة والأسئلة التقنية."
-                            : "يرجى مراجعة التفسير الأكاديمي للأسئلة بالأسفل وإعادة المحاولة لترسيخ المفاهيم."}
-                        </p>
-                      </div>
-
-                      {/* Score metric cards */}
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 max-w-lg mx-auto pt-2">
-                        <div className="p-3 sm:p-4 rounded-2xl bg-muted/40 border border-border/60">
-                          <div className="text-xl sm:text-3xl font-black text-primary font-mono">{pct}%</div>
-                          <div className="text-[11px] text-muted-foreground font-semibold mt-1">النسبة المئوية</div>
-                        </div>
-                        <div className="p-3 sm:p-4 rounded-2xl bg-muted/40 border border-border/60">
-                          <div className="text-xl sm:text-3xl font-black text-emerald-400 font-mono">{correct}</div>
-                          <div className="text-[11px] text-muted-foreground font-semibold mt-1">إجابات صحيحة</div>
-                        </div>
-                        <div className="p-3 sm:p-4 rounded-2xl bg-muted/40 border border-border/60">
-                          <div className="text-xl sm:text-3xl font-black text-rose-400 font-mono">{total - correct}</div>
-                          <div className="text-[11px] text-muted-foreground font-semibold mt-1">إجابات خاطئة</div>
-                        </div>
-                        <div className="p-3 sm:p-4 rounded-2xl bg-muted/40 border border-border/60">
-                          <div className="text-sm sm:text-lg font-black text-amber-400 font-mono">
-                            {formatDuration(activeQuizSession.elapsedSeconds)}
-                          </div>
-                          <div className="text-[11px] text-muted-foreground font-semibold mt-1">الوقت المستغرق</div>
-                        </div>
-                      </div>
-
-                      {/* Action buttons */}
-                      <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                        <Button
-                          onClick={() => {
-                            handleResetQuiz(activeQuizSession.lectureId)
-                            setActiveQuizSession((prev) =>
-                              prev ? { ...prev, currentIndex: 0, isGraded: false } : null
-                            )
-                          }}
-                          variant="outline"
-                          className="h-10 px-5 rounded-xl border-border text-xs font-bold gap-2 cursor-pointer hover:bg-muted"
-                        >
-                          <RotateCcw className="size-3.5" />
-                          <span>إعادة الاختبار من البداية</span>
-                        </Button>
-                        <Button
-                          onClick={() => setActiveQuizSession(null)}
-                          className="btn-primary-glow h-10 px-6 rounded-xl text-xs font-bold cursor-pointer"
-                        >
-                          <span>العودة للمحاضرة</span>
-                        </Button>
-                      </div>
-                    </div>
-                  )
-                })()}
-
-                {/* Detailed Questions Review List (English / LTR) */}
-                <div className="space-y-4 pt-4">
-                  <div className="flex items-center justify-between px-1">
-                    <h3 className="text-sm font-bold text-foreground">
-                      مراجعة الأسئلة والتفسير الأكاديمي بالتفصيل
-                    </h3>
-                    <span className="text-xs text-muted-foreground font-mono">
-                      {activeQuizSession.questions.length} Items
-                    </span>
-                  </div>
-
-                  <div className="space-y-3.5">
-                    {activeQuizSession.questions.map((q, qIdx) => {
-                      const currentAnswers = quizAnswers[activeQuizSession.lectureId] || {}
-                      const chosenOpt = currentAnswers[q.id]
-                      const isCorrect = chosenOpt === q.correctIndex
-                      const isUnanswered = chosenOpt === undefined
-
-                      return (
-                        <div
-                          key={q.id || qIdx}
-                          className={`p-4 sm:p-5 rounded-2xl border transition-all text-start space-y-3 ${
-                            isCorrect
-                              ? "border-emerald-500/30 bg-emerald-950/10"
-                              : "border-rose-500/30 bg-rose-950/10"
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-muted text-muted-foreground">
-                              QUESTION #{qIdx + 1}
-                            </span>
-                            <span
-                              className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
-                                isCorrect
-                                  ? "bg-emerald-500/20 text-emerald-300"
-                                  : "bg-rose-500/20 text-rose-300"
-                              }`}
-                            >
-                              {isCorrect ? "إجابة صحيحة" : isUnanswered ? "لم يتم الإجابة" : "إجابة غير صحيحة"}
-                            </span>
-                          </div>
-
-                          {/* Question text in English LTR */}
-                          <div dir="ltr" className="font-semibold text-slate-100 text-xs sm:text-sm font-sans leading-relaxed whitespace-pre-wrap text-left">
-                            {q.question}
-                          </div>
-
-                          {/* Options list in English LTR */}
-                          <div dir="ltr" className="space-y-2 pt-1 font-sans text-left">
-                            {q.options.map((opt, optIdx) => {
-                              const isThisChosen = chosenOpt === optIdx
-                              const isThisCorrect = q.correctIndex === optIdx
-
-                              let style = "border-border/50 bg-card/60 text-muted-foreground"
-                              if (isThisCorrect) {
-                                style = "border-emerald-500/60 bg-emerald-500/15 text-emerald-300 font-bold"
-                              } else if (isThisChosen && !isThisCorrect) {
-                                style = "border-rose-500/60 bg-rose-500/15 text-rose-300 font-bold"
-                              }
-
-                              const optionLetters = ["A", "B", "C", "D", "E"]
-
-                              return (
-                                <div
-                                  key={optIdx}
-                                  className={`p-2.5 sm:p-3 rounded-xl border text-xs sm:text-sm flex items-center justify-between gap-3 ${style}`}
-                                >
-                                  <div className="flex items-center gap-2.5">
-                                    <span className="size-6 rounded-lg bg-black/30 border border-current/20 flex items-center justify-center font-mono font-black text-xs shrink-0">
-                                      {optionLetters[optIdx] || optIdx + 1}
-                                    </span>
-                                    <span className="leading-relaxed whitespace-pre-wrap">{opt}</span>
-                                  </div>
-                                  {isThisCorrect && (
-                                    <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
-                                  )}
-                                  {isThisChosen && !isThisCorrect && (
-                                    <XCircle className="size-4 text-rose-400 shrink-0" />
-                                  )}
-                                </div>
-                              )
-                            })}
-                          </div>
-
-                          {/* Academic Explanation */}
-                          {q.explanation && (
-                            <div className="p-3 rounded-xl bg-muted/40 border border-border/60 text-xs text-muted-foreground space-y-1">
-                              <div className="flex items-center gap-1.5 text-primary font-bold text-[11px]">
-                                <HelpCircle className="size-3.5" />
-                                <span>Academic Explanation / التفسير الأكاديمي:</span>
-                              </div>
-                              <p dir="ltr" className="text-left font-sans leading-relaxed whitespace-pre-wrap text-foreground/90">
-                                {q.explanation}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* ===== LIVE INTERACTIVE ASSESSMENT MODE ===== */
-              (() => {
-                const currentAnswers = quizAnswers[activeQuizSession.lectureId] || {}
-                const currentQ = activeQuizSession.questions[activeQuizSession.currentIndex]
-                const total = activeQuizSession.questions.length
-                const answeredCount = Object.keys(currentAnswers).length
-                const currentChosen = currentQ ? currentAnswers[currentQ.id] : undefined
-                const progressPct = ((activeQuizSession.currentIndex + 1) / total) * 100
-                const optionLetters = ["A", "B", "C", "D", "E"]
-
-                return (
-                  <div className="space-y-6 animate-in fade-in-50 duration-200 py-4">
-                    {/* Top Progress Bar & Step Tracker */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-xs text-muted-foreground font-mono">
-                        <span className="font-bold text-foreground">
-                          Question {activeQuizSession.currentIndex + 1} of {total}
-                        </span>
-                        <span>{answeredCount} of {total} answered</span>
-                      </div>
-                      <div className="w-full h-2 rounded-full bg-muted/60 overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-primary to-emerald-400 transition-all duration-300 rounded-full"
-                          style={{ width: `${progressPct}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Question Navigator Pills */}
-                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none justify-start sm:justify-center">
-                      {activeQuizSession.questions.map((q, idx) => {
-                        const isAns = currentAnswers[q.id] !== undefined
-                        const isCur = idx === activeQuizSession.currentIndex
-                        return (
-                          <button
-                            key={q.id || idx}
-                            type="button"
-                            onClick={() =>
-                              setActiveQuizSession((prev) => (prev ? { ...prev, currentIndex: idx } : null))
-                            }
-                            className={`h-8 min-w-[32px] px-2.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
-                              isCur
-                                ? "bg-primary text-primary-foreground shadow-md ring-2 ring-primary/40 scale-105"
-                                : isAns
-                                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30"
-                                : "bg-muted/40 text-muted-foreground border border-border/50 hover:bg-muted"
-                            }`}
-                          >
-                            {idx + 1}
-                          </button>
-                        )
-                      })}
-                    </div>
-
-                    {/* Active Question Box (Strict LTR for English technical content) */}
-                    {currentQ && (
-                      <div className="p-5 sm:p-8 rounded-3xl border border-border/80 bg-card/80 backdrop-blur-sm shadow-xl space-y-6">
-                        <div className="flex items-center justify-between border-b border-border/40 pb-3">
-                          <span className="text-xs font-mono font-black text-primary px-2.5 py-1 rounded-md bg-primary/10 border border-primary/20">
-                            QUESTION {String(activeQuizSession.currentIndex + 1).padStart(2, "0")}
-                          </span>
-                          <span className="text-[11px] text-muted-foreground font-sans">
-                            Select one answer
-                          </span>
-                        </div>
-
-                        {/* Question Text (LTR English) */}
-                        <div
-                          dir="ltr"
-                          className="font-semibold text-slate-100 text-sm sm:text-base md:text-lg font-sans leading-relaxed whitespace-pre-wrap text-left"
-                        >
-                          {currentQ.question}
-                        </div>
-
-                        {/* Options List (LTR English) */}
-                        <div dir="ltr" className="space-y-3 font-sans text-left">
-                          {currentQ.options.map((opt, optIdx) => {
-                            const isSelected = currentChosen === optIdx
-                            return (
-                              <button
-                                key={optIdx}
-                                type="button"
-                                onClick={() =>
-                                  handleSelectQuizAnswer(activeQuizSession.lectureId, currentQ.id, optIdx)
-                                }
-                                className={`w-full p-3.5 sm:p-4 rounded-2xl border text-xs sm:text-sm transition-all flex items-center justify-between gap-3 text-left cursor-pointer group ${
-                                  isSelected
-                                    ? "border-primary bg-primary/15 text-foreground font-bold shadow-md shadow-primary/10 ring-1 ring-primary/50"
-                                    : "border-border/60 bg-muted/20 hover:bg-muted/50 text-muted-foreground hover:text-foreground"
-                                }`}
-                              >
-                                <div className="flex items-center gap-3">
-                                  <span
-                                    className={`size-7 rounded-xl flex items-center justify-center font-mono font-bold text-xs shrink-0 transition-colors ${
-                                      isSelected
-                                        ? "bg-primary text-primary-foreground font-black"
-                                        : "bg-muted/70 text-foreground group-hover:bg-muted"
-                                    }`}
-                                  >
-                                    {optionLetters[optIdx] || optIdx + 1}
-                                  </span>
-                                  <span className="leading-relaxed whitespace-pre-wrap">{opt}</span>
-                                </div>
-                                {isSelected && (
-                                  <div className="size-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center shrink-0">
-                                    <Check className="size-3 stroke-[3]" />
-                                  </div>
-                                )}
-                              </button>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Navigation and Submission Controls */}
-                    <div className="flex items-center justify-between gap-3 pt-2">
-                      <Button
-                        variant="outline"
-                        disabled={activeQuizSession.currentIndex === 0}
-                        onClick={() =>
-                          setActiveQuizSession((prev) =>
-                            prev ? { ...prev, currentIndex: Math.max(0, prev.currentIndex - 1) } : null
-                          )
-                        }
-                        className="h-10 px-4 rounded-xl text-xs font-bold gap-1.5 cursor-pointer disabled:opacity-30"
-                      >
-                        <ArrowRight className="size-4" />
-                        <span>السابق</span>
-                      </Button>
-
-                      {activeQuizSession.currentIndex === total - 1 ? (
-                        <Button
-                          onClick={() => {
-                            handleSubmitQuiz(activeQuizSession.lectureId)
-                            setActiveQuizSession((prev) => (prev ? { ...prev, isGraded: true } : null))
-                          }}
-                          className="btn-primary-glow h-11 px-6 rounded-xl text-xs sm:text-sm font-bold gap-2 cursor-pointer shadow-xl shadow-primary/20"
-                        >
-                          <CheckCircle2 className="size-4" />
-                          <span>إنهاء الاختبار واعتماد النتيجة</span>
-                        </Button>
-                      ) : (
-                        <Button
-                          onClick={() =>
-                            setActiveQuizSession((prev) =>
-                              prev ? { ...prev, currentIndex: Math.min(total - 1, prev.currentIndex + 1) } : null
-                            )
-                          }
-                          className="h-10 px-5 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-bold gap-1.5 cursor-pointer"
-                        >
-                          <span>التالي</span>
-                          <ArrowLeft className="size-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                )
-              })()
-            )}
-          </div>
-        </div>
-      )}
+      <QuizAssessmentModal
+        courseCode={course.code}
+        session={activeQuizSession}
+        quizAnswers={quizAnswers}
+        onClose={() => setActiveQuizSession(null)}
+        onSelectAnswer={handleSelectQuizAnswer}
+        onSubmitQuiz={handleSubmitQuiz}
+        onResetQuiz={handleResetQuiz}
+        onSetSession={setActiveQuizSession}
+      />
       {/* 6. Mistake Bank Modal (بنك الأسئلة ومراجعة الأخطاء) */}
-      {isMistakeBankOpen && (
-        <div
-          className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in duration-200"
-          dir="rtl"
-        >
-          <div className="bg-card border border-border/80 rounded-3xl max-w-2xl w-full p-4 sm:p-6 space-y-5 shadow-2xl my-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-border/60">
-              <div className="flex items-center gap-2.5">
-                <div className="size-9 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center shrink-0">
-                  <AlertCircle className="size-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm sm:text-base font-black text-foreground">
-                    بنك مراجعة الأخطاء (Smart Mistake Bank)
-                  </h3>
-                  <p className="text-[11px] sm:text-xs text-muted-foreground">
-                    الأسئلة التي أخطأت في إجابتها سابقاً لتقوم بمراجعتها وإعادة التدرب عليها
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsMistakeBankOpen(false)}
-                className="size-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center cursor-pointer"
-              >
-                <X className="size-5" />
-              </button>
-            </div>
-
-            {mistakesList.length === 0 ? (
-              <div className="py-12 text-center space-y-3">
-                <div className="size-14 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center mx-auto">
-                  <Sparkles className="size-7" />
-                </div>
-                <div className="space-y-1">
-                  <h4 className="text-sm font-bold text-foreground">لا توجد أخطاء مسجلة حالياً!</h4>
-                  <p className="text-xs text-muted-foreground max-w-xs mx-auto">
-                    رائع جداً! إما أنك لم تخطئ في أي كويز، أو قمت بمراجعة وتصحيح جميع أخطائك بنجاح.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
-                  <span className="font-bold text-foreground">
-                    عدد الأسئلة المطلوب مراجعتها: {mistakesList.length}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      clearAllCourseMistakes(activeCourse.id)
-                      setMistakesList([])
-                      clearAllCourseMistakesInDb(activeCourse.id).catch(() => {/* silent */})
-                    }}
-                    className="text-rose-400 hover:text-rose-300 underline font-semibold cursor-pointer"
-                  >
-                    مسح السجل بالكامل
-                  </button>
-                </div>
-
-                <div className="max-h-[50vh] overflow-y-auto space-y-3 pe-1">
-                  {mistakesList.map((m) => (
-                    <div
-                      key={m.questionId}
-                      className="p-3.5 sm:p-4 rounded-2xl border border-border/70 bg-muted/20 space-y-2 text-start"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-bold text-primary px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20">
-                          {m.lectureTitle}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            clearResolvedMistake(activeCourse.id, m.questionId)
-                            setMistakesList(getCourseMistakes(activeCourse.id))
-                            removeMistakesFromDb(activeCourse.id, [m.questionId]).catch(() => {/* silent */})
-                          }}
-                          className="text-[11px] text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
-                        >
-                          تحديد كتم فهمه وتصحيحه ✓
-                        </button>
-                      </div>
-
-                      <div dir="ltr" className="text-xs sm:text-sm font-semibold text-foreground text-left font-sans">
-                        {m.questionText}
-                      </div>
-
-                      <div className="text-xs space-y-1 pt-1">
-                        <div className="text-rose-400 flex items-center gap-1.5 font-medium">
-                          <XCircle className="size-3.5 shrink-0" />
-                          <span>إجابتك السابقة: {m.options[m.userSelectedIndex] || "غير محددة"}</span>
-                        </div>
-                        <div className="text-emerald-400 flex items-center gap-1.5 font-bold">
-                          <CheckCircle2 className="size-3.5 shrink-0" />
-                          <span>الإجابة الصحيحة: {m.options[m.correctIndex]}</span>
-                        </div>
-                        {m.explanation && (
-                          <p dir="ltr" className="text-[11px] text-muted-foreground bg-muted/50 p-2 rounded-lg text-left font-sans mt-1">
-                            {m.explanation}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="pt-2 flex items-center justify-end gap-2 border-t border-border/60">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsMistakeBankOpen(false)}
-                    className="text-xs font-bold"
-                  >
-                    إغلاق
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={handlePracticeMistakes}
-                    className="bg-primary text-primary-foreground text-xs font-bold gap-1.5"
-                  >
-                    <Target className="size-3.5" />
-                    <span>بدء اختبار تدريبي على هذه الأخطاء الآن</span>
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <MistakeBankModal
+        isOpen={isMistakeBankOpen}
+        onClose={() => setIsMistakeBankOpen(false)}
+        mistakesList={mistakesList}
+        onClearAll={() => {
+          clearAllCourseMistakes(activeCourse.id)
+          setMistakesList([])
+          clearAllCourseMistakesInDb(activeCourse.id).catch(() => {/* silent */})
+        }}
+        onResolveMistake={(questionId) => {
+          clearResolvedMistake(activeCourse.id, questionId)
+          setMistakesList(getCourseMistakes(activeCourse.id))
+          removeMistakesFromDb(activeCourse.id, [questionId]).catch(() => {/* silent */})
+        }}
+        onPracticeMistakes={handlePracticeMistakes}
+      />
     </div>
   )
 }

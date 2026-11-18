@@ -1,9 +1,12 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { createClient, createAdminClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/server"
 import { sanitizeInput } from "@/lib/security"
+import { assertAdminCaller as baseAssertAdminCaller } from "@/lib/actions/adminUtils"
 import type { UserRole } from "@/types/database"
+
+const assertAdminCaller = () => baseAssertAdminCaller({ allowEditor: false })
 
 export interface AdminMember {
   id: string
@@ -22,33 +25,6 @@ export interface AdminMembersResult {
   success: boolean
   members?: AdminMember[]
   error?: string
-}
-
-/**
- * Helper to strictly verify the caller is an authenticated administrator.
- */
-async function assertAdminCaller() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    throw new Error("غير مصرح: يجب تسجيل الدخول كمسؤول")
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single()
-
-  const role = (profile as { role?: string } | null)?.role
-  if (role !== "admin") {
-    throw new Error("غير مصرح: هذا الإجراء مخصص لمدير المنصة فقط")
-  }
-
-  return { supabase, user }
 }
 
 /**

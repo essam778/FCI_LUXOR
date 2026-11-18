@@ -29,6 +29,7 @@ import {
   type Course,
 } from "@/data/coursesData"
 import { isFreeTrialCourse } from "@/lib/subscriptionUtils"
+import { parseCourseTitle } from "@/lib/utils"
 
 interface CoursesExplorerProps {
   userLevel?: number | null
@@ -36,14 +37,6 @@ interface CoursesExplorerProps {
   userRole?: string | null
   subscriptionStatus?: string | null
   initialCourses?: Course[]
-}
-
-function parseCourseTitle(title: string): { ar: string; en: string } {
-  const match = title.match(/^(.*?)\s*\((.*?)\)$/)
-  if (match) {
-    return { ar: match[1].trim(), en: match[2].trim() }
-  }
-  return { ar: title, en: "" }
 }
 
 function getCourseIcon(code: string) {

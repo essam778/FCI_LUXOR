@@ -2,6 +2,7 @@
 
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { sanitizeInput, sanitizeUrl } from "@/lib/security"
+import { assertAdminCaller } from "@/lib/actions/adminUtils"
 
 export interface CreateNotificationParams {
   title: string
@@ -50,6 +51,7 @@ export async function dispatchRealNotification({
   }
 
   try {
+    await assertAdminCaller()
     const supabase = await createClient()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const client: any = createAdminClient() || supabase
@@ -93,6 +95,7 @@ export async function fetchAdminNotificationLogs(): Promise<{
   error?: string
 }> {
   try {
+    await assertAdminCaller()
     const supabase = await createClient()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const client: any = createAdminClient() || supabase
@@ -118,6 +121,7 @@ export async function fetchAdminNotificationLogs(): Promise<{
  */
 export async function deleteNotificationById(id: string): Promise<{ success: boolean; error?: string }> {
   try {
+    await assertAdminCaller()
     const supabase = await createClient()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const client: any = createAdminClient() || supabase

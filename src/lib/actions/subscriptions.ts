@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { createClient, createAdminClient } from "@/lib/supabase/server"
 import { sanitizeInput } from "@/lib/security"
 import { dispatchRealNotification } from "@/lib/notifications"
+import { assertAdminCaller } from "@/lib/actions/adminUtils"
 
 export interface PaymentRequestItem {
   id: string
@@ -23,35 +24,6 @@ export interface PaymentRequestItem {
     level: number | null
     university: string | null
   }
-}
-
-/**
- * Helper to assert admin or editor caller
- */
-async function assertAdminCaller() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    throw new Error("غير مصرح: يجب تسجيل الدخول أولاً")
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const client: any = createAdminClient() || supabase
-  const { data: profile } = await client
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single()
-
-  const role = (profile as { role?: string } | null)?.role
-  if (role !== "admin" && role !== "editor") {
-    throw new Error("غير مصرح: هذه العملية مخصصة للمشرفين والمديرين فقط")
-  }
-
-  return { supabase, client, user }
 }
 
 /**

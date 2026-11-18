@@ -162,3 +162,4 @@ FROM student_analytics
 WHERE last_studied_at < now() - INTERVAL '7 days';
 
 GRANT SELECT ON student_stale_courses TO authenticated;
+

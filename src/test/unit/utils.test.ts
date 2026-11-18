@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { cn } from "@/lib/utils"
+import { cn, parseCourseTitle } from "@/lib/utils"
 
 describe("UI Utils (Unit Tests)", () => {
   describe("cn (Tailwind class merger)", () => {
@@ -33,6 +33,35 @@ describe("UI Utils (Unit Tests)", () => {
     it("should merge arrays and nested expressions properly", () => {
       const result = cn(["flex", "items-center"], ["justify-between", "gap-2"])
       expect(result).toBe("flex items-center justify-between gap-2")
+    })
+  })
+
+  describe("parseCourseTitle", () => {
+    it("should parse course name and code correctly from standard parenthesis format", () => {
+      const result = parseCourseTitle("Software Engineering (CS301)")
+      expect(result.name).toBe("Software Engineering")
+      expect(result.code).toBe("CS301")
+      expect(result.ar).toBe("Software Engineering")
+      expect(result.en).toBe("CS301")
+    })
+
+    it("should parse Arabic name and English subtitle/code correctly", () => {
+      const result = parseCourseTitle("هندسة البرمجيات (Software Engineering)")
+      expect(result.ar).toBe("هندسة البرمجيات")
+      expect(result.en).toBe("Software Engineering")
+    })
+
+    it("should return full title as name/ar and empty code/en when no parentheses are present", () => {
+      const result = parseCourseTitle("Computer Architecture")
+      expect(result.name).toBe("Computer Architecture")
+      expect(result.code).toBe("")
+      expect(result.ar).toBe("Computer Architecture")
+      expect(result.en).toBe("")
+    })
+
+    it("should return empty strings for empty input", () => {
+      const result = parseCourseTitle("")
+      expect(result).toEqual({ ar: "", en: "", name: "", code: "" })
     })
   })
 })

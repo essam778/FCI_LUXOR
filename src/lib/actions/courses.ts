@@ -1,33 +1,10 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { createClient, createAdminClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/server"
 import { sanitizeInput } from "@/lib/security"
+import { assertAdminCaller } from "@/lib/actions/adminUtils"
 import type { Course } from "@/data/coursesData"
-
-async function assertAdminCaller() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    throw new Error("غير مصرح: يجب تسجيل الدخول أولاً")
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single()
-
-  const role = (profile as { role?: string } | null)?.role
-  if (role !== "admin" && role !== "editor") {
-    throw new Error("غير مصرح: هذه العملية مخصصة للمشرفين والمديرين فقط")
-  }
-
-  return { supabase, user }
-}
 
 /**
  * Save or update a course in Supabase database.
@@ -496,9 +473,26 @@ export async function uploadCourseCoverAction(
       return { success: false, error: "Please select an image file to upload." }
     }
 
+    const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"]
+    const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+      return { success: false, error: "صيغة الملف غير مدعومة. يرجى اختيار صورة صالحة (JPEG, PNG, WEBP)." }
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      return { success: false, error: "حجم الصورة كبير جداً، الحد الأقصى هو 5 ميجابايت." }
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const client: any = createAdminClient() || supabase
-    const ext = file.name.split(".").pop() || "jpg"
+    const extMap: Record<string, string> = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+      "image/gif": "gif",
+    }
+    const ext = extMap[file.type] || "jpg"
     const fileName = `cover-${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`
 
     const { data, error } = await client.storage
