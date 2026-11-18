@@ -111,11 +111,8 @@ export function AdminDashboard({
     setIsSyncingAll(true)
     setSavedStatus("جاري مزامنة كافة المقررات والمحاضرات مع قاعدة بيانات Supabase السحابية...")
     try {
-      let successCount = 0
-      for (const course of coursesList) {
-        const res = await syncFullCourseToDatabase(course)
-        if (res.success) successCount++
-      }
+      const results = await Promise.all(coursesList.map((course) => syncFullCourseToDatabase(course)))
+      const successCount = results.filter((r) => r.success).length
       setSavedStatus(`تمت مزامنة ${successCount} من أصل ${coursesList.length} مقرر دراسي مع Supabase بنجاح! ☁️✓`)
     } catch (err) {
       alert(err instanceof Error ? err.message : "فشلت المزامنة الشاملة")

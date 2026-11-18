@@ -7,6 +7,7 @@ import { StudentNotesWidget } from "@/components/notes/StudentNotesWidget"
 import { Footer } from "@/components/layout/Footer"
 import { KineticGrid } from "@/components/ui/kinetic-grid"
 import { SingleDeviceEnforcer } from "@/components/auth/SingleDeviceEnforcer"
+import { createClient } from "@/lib/supabase/server"
 
 const alexandria = Alexandria({
   subsets: ["arabic", "latin"],
@@ -19,8 +20,6 @@ const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains",
   display: "swap",
 })
-
-import { createClient } from "@/lib/supabase/server"
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://fci-luxor-essam778s-projects.vercel.app"
 
